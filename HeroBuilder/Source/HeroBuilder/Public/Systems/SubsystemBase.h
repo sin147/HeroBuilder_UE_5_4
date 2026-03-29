@@ -4,13 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "SubsystemBase.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class HEROBUILDER_API USubsystemBase : public UWorldSubsystem
+class HEROBUILDER_API USubsystemBase : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
 	friend class ANetworkProxyBase;
@@ -29,7 +30,14 @@ protected:
 		}
 		return Cast<T>(NetworkProxy);
 	}
+	//设置网络代理
+	void SetNetworkProxy(ANetworkProxyBase* InNetworkProxy)
+	{
+		NetworkProxy = InNetworkProxy;
+	}
+
 public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
     virtual ANetworkProxyBase* CreateNetworkProxy(APlayerController* InOwner);
+    virtual TStatId GetStatId() const override final;
 };

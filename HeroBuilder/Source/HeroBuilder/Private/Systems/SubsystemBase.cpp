@@ -34,3 +34,8 @@ ANetworkProxyBase* USubsystemBase::CreateNetworkProxy(APlayerController* InOwner
 	}
 	return nullptr;
 }
+
+TStatId USubsystemBase::GetStatId() const
+{
+	return TStatId();
+}

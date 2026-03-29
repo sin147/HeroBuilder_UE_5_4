@@ -22,7 +22,13 @@ struct FWaveSetting
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<TSubclassOf<AActor>, FEnemySetting> EnemyTypes;
+	TMap<TSubclassOf<AActor>, FEnemySetting> EnemySettings;
+
+	//休整时间
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float ResetInterval;
+
+
 };
 
 
