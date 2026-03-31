@@ -5,6 +5,9 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "WaveConfig.generated.h"
+class AEnemyBase;
+
+
 USTRUCT(BlueprintType)
 struct FEnemySetting
 {
@@ -22,7 +25,7 @@ struct FWaveSetting
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<TSubclassOf<AActor>, FEnemySetting> EnemySettings;
+	TMap<TSubclassOf<AEnemyBase>, FEnemySetting> EnemySettings;
 
 	//休整时间
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))

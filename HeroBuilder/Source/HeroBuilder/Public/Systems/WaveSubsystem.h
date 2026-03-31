@@ -24,10 +24,10 @@ class HEROBUILDER_API UWaveSubsystem : public USubsystemBase
 	GENERATED_BODY()
 private:
     TObjectPtr<UWaveConfig> WaveConfig;
-	TMap<TSubclassOf<AActor>,int32> EnemyCountMap;
-	TMap<TSubclassOf<AActor>, float> EnemySpawnIntervalMap;
-	TMap<TSubclassOf<AActor>, float> EnemyNeedSpawnIntervalMap;
-	TMap<TSubclassOf<AActor>, int32> EnemyNeedSpawnCountMap;
+	TMap<TSubclassOf<AEnemyBase>,int32> EnemyCountMap;
+	TMap<TSubclassOf<AEnemyBase>, float> EnemySpawnIntervalMap;
+	TMap<TSubclassOf<AEnemyBase>, float> EnemyNeedSpawnIntervalMap;
+	TMap<TSubclassOf<AEnemyBase>, int32> EnemyNeedSpawnCountMap;
 	EWaveState CurrentWaveType=EWaveState::None;
 	float CurrentResetTime;
 	float CurrentCombatTime;

@@ -6,6 +6,17 @@
 #include "GameFramework/Character.h"
 #include "Interface/DamageInterface.h"
 #include "EnemyBase.generated.h"
+USTRUCT(BlueprintType)
+struct FEnemyConfig
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float HP = 100;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float Attack = 10;
+};
 
 UENUM(BlueprintType)
 enum class EEnemyType : uint8
@@ -20,7 +31,9 @@ UCLASS(Blueprintable)
 class HEROBUILDER_API AEnemyBase : public ACharacter,public IDamageInterface
 {
 	GENERATED_BODY()
-
+	friend class UEnemySubsystem;
+private:
+	FEnemyConfig EnemyConfig;
 public:
 	// Sets default values for this character's properties
 	AEnemyBase();
@@ -28,21 +41,14 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
+protected:
+	void SetEnemyConfig(FEnemyConfig Config);
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-	float Health;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
-	float MaxHealth;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
-	float AttackDamage;
 
 	// Enemy functions
     virtual void ApplyDamage(float DamageAmount, AActor* DamageCauser) override;

@@ -2,6 +2,7 @@
 
 
 #include "Systems/WaveSubsystem.h"
+#include"Systems/EnemySubsystem.h"
 
 void UWaveSubsystem::ApplyWaveByIndex(int32 Index)
 {
@@ -46,10 +47,10 @@ void UWaveSubsystem::Tick(float DeltaTime)
 		CurrentCombatTime += DeltaTime;
 		UE_LOG(LogTemp, Log, TEXT("CombattTime %lf"), CurrentCombatTime);
 		int32 SpawnOverEnemy = 0;
-		for (TPair<TSubclassOf<AActor>, float> EnemySpawnIntervalPair : EnemySpawnIntervalMap)
+		for (TPair<TSubclassOf<AEnemyBase>, float> EnemySpawnIntervalPair : EnemySpawnIntervalMap)
 		{
 
-			TSubclassOf<AActor> EnemyClass = EnemySpawnIntervalPair.Key;
+			TSubclassOf<AEnemyBase> EnemyClass = EnemySpawnIntervalPair.Key;
 			if (EnemyNeedSpawnCountMap[EnemyClass] > 0)
 			{
 				EnemySpawnIntervalMap[EnemyClass] += DeltaTime;
@@ -59,7 +60,7 @@ void UWaveSubsystem::Tick(float DeltaTime)
 					EnemyNeedSpawnCountMap[EnemyClass]--;
 					EnemyCountMap[EnemyClass]++;
 					//接敌人系统的生成接口TODO
-					UE_LOG(LogTemp, Log, TEXT("Spawn************************************"));
+					GetWorld()->GetSubsystem<UEnemySubsystem>()->SpawnEnemyByEnemyBirthPoint(EnemyClass);
 				}
 			}
 			else
