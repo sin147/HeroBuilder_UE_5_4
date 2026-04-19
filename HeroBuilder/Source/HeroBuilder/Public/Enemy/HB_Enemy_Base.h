@@ -26,9 +26,15 @@ private:
 	UPROPERTY(Replicated)
 	bool bIsDead=false;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
-	float DeathTime=3;
+	float DeathTime=10;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	float AttackDistance=100;
+
+
+	float PreDamage = 0;
+	void UpdateHealth();
+protected:
+	bool bIsServer;
 
 public:
 	// Sets default values for this character's properties
@@ -44,12 +50,7 @@ protected:
     //当客户端应用伤害
     void OnClientApplyDamage(AActor* Attacker, float Damage);
 	//服务端死亡
-	UFUNCTION(Server,Reliable)
-	void Server_Death();
-	//客户端死亡
-	UFUNCTION(NetMulticast,Reliable)
-	void NetMulticast_Death();
-
+	void Death();
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

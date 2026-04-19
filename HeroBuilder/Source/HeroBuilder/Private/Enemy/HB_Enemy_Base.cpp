@@ -6,6 +6,20 @@
 #include "Net/UnrealNetwork.h"
 #include "AIController.h"
 
+void AHB_Enemy_Base::UpdateHealth()
+{
+	if (!bIsServer)
+	{
+		return;
+	}
+	Health=FMath::Clamp(Health-PreDamage,MaxHealth,0);
+    PreDamage = 0.0f;
+    if (Health <= 0.0f)
+    {
+        Death();
+    }
+}
+
 // Sets default values
 AHB_Enemy_Base::AHB_Enemy_Base()
 {
@@ -23,6 +37,11 @@ bool AHB_Enemy_Base::IsDeath()
 void AHB_Enemy_Base::BeginPlay()
 {
 	Super::BeginPlay();
+	ENetMode NetMode=GetWorld()->GetNetMode();
+	if (NetMode == NM_ListenServer || NetMode == NM_DedicatedServer || NetMode == NM_Standalone)
+	{
+		bIsServer = true;
+	}
 	Health = MaxHealth;
 	ENetMode NetMode = GetWorld()->GetNetMode();
     if (NetMode == NM_DedicatedServer|| NetMode == NM_Standalone || NetMode == NM_ListenServer)
@@ -38,8 +57,7 @@ void AHB_Enemy_Base::BeginPlay()
 void AHB_Enemy_Base::OnServerApplyDamage(AActor* Attacker, float Damage)
 {
     //扣血
-    Health=FMath::Max(0, Health-Damage);
-	UE_LOG(LogTemp, Log, TEXT("Server:CurrentlyHealth %lf"), Health);
+	PreDamage += Damage;
 }
 
 void AHB_Enemy_Base::OnClientApplyDamage(AActor* Attacker, float Damage)
@@ -48,8 +66,12 @@ void AHB_Enemy_Base::OnClientApplyDamage(AActor* Attacker, float Damage)
 	UE_LOG(LogTemp, Log, TEXT("Client:CurrentlyHealth %lf"), Health- Damage);
 }
 
-void AHB_Enemy_Base::Server_Death_Implementation()
+void AHB_Enemy_Base::Death()
 {
+	if (bIsServer)
+	{
+		return;
+	}
 	bIsDead=true;
 	FTimerHandle DeathTimer;
 	FTimerDelegate DeathDelegate;
@@ -58,18 +80,13 @@ void AHB_Enemy_Base::Server_Death_Implementation()
 			Destroy();
 		});
     GetWorld()->GetTimerManager().SetTimer(DeathTimer,DeathDelegate, DeathTime,false);
-	NetMulticast_Death();
-}
-
-void AHB_Enemy_Base::NetMulticast_Death_Implementation()
-{
-	
 }
 
 // Called every frame
 void AHB_Enemy_Base::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	UpdateHealth();
 
 }
 
