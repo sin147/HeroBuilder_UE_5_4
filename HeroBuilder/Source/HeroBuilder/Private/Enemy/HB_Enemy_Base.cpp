@@ -43,7 +43,6 @@ void AHB_Enemy_Base::BeginPlay()
 		bIsServer = true;
 	}
 	Health = MaxHealth;
-	ENetMode NetMode = GetWorld()->GetNetMode();
     if (NetMode == NM_DedicatedServer|| NetMode == NM_Standalone || NetMode == NM_ListenServer)
 	{
 		DamageComponent->OnApplyDamage_Server.BindUObject(this, &AHB_Enemy_Base::OnServerApplyDamage);
