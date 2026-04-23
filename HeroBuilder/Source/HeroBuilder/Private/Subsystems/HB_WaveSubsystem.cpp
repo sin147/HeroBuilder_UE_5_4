@@ -66,18 +66,30 @@ void UHB_WaveSubsystem::WaveTick(float DeltaTime)
 	
 				if(SpawnPoints.Num() != 0)
 				{
-					GetWorld()->SpawnActor<AHB_Enemy_Base>(EnemyConfig.EnemyClass, FTransform(FRotator(0, 0, 0), FVector(SpawnPoints[FMath::RandRange(0, SpawnPoints.Num() - 1)]), FVector(1, 1, 1)));
-
+					AHB_SpawnPoint_Enemy * SpawnPoint = GetAnRandSpawnPoint();
+					SpawnPoint->Spawn(EnemyConfig.EnemyClass,true);
+				}
+				else
+				{
+					UE_LOG(LogWaveSubsystem, Error, TEXT("Put SpawnPoint in the map"));
 				}
 				UE_LOG(LogWaveSubsystem, Log, TEXT("Spawn Enemy %s"), *EnemyConfig.EnemyClass->GetName());
 				EnemyConfig.EnemyCount -= 1;
-				EnemyConfig.SpawnInterval += CurrentlyWaveConfig.EnemyConfigs[i].SpawnInterval;
+				if (CurrentlyWaveConfig.EnemyConfigs.IsValidIndex(i))
+				{
+					EnemyConfig.SpawnInterval += CurrentlyWaveConfig.EnemyConfigs[i].SpawnInterval;
+				}
+				else
+				{
+					UE_LOG(LogWaveSubsystem, Error, TEXT("Array index %d out of bounds in EnemyConfigs"), i);
+				}
 			}
 		}
-		if (IsSpawnOver)
+		//还需要等待所有敌人被击杀TODO
+		if (IsSpawnOver&& EnemyTotalCount == 0)
 		{
-				WaveState = WS_End;
-				UE_LOG(LogWaveSubsystem, Log, TEXT("Enter EndState"));
+			WaveState = WS_End;
+			UE_LOG(LogWaveSubsystem, Log, TEXT("Enter EndState"));
 		}
 		break;
 	}
@@ -99,6 +111,28 @@ void UHB_WaveSubsystem::WaveTick(float DeltaTime)
 		break;
 	}
 	
+}
+
+void UHB_WaveSubsystem::AddSpawnPoint(AHB_SpawnPoint_Enemy* SpawnPoint)
+{
+	SpawnPoints.Add(SpawnPoint);
+}
+
+AHB_SpawnPoint_Enemy* UHB_WaveSubsystem::GetAnRandSpawnPoint()
+{
+	AHB_SpawnPoint_Enemy* RetSpawnPoint = SpawnPoints[FMath::RandRange(0, SpawnPoints.Num() - 1)];
+	if (!RetSpawnPoint->CanSpawn())
+	{
+		for (AHB_SpawnPoint_Enemy* TempSpawnPoint : SpawnPoints)
+		{
+			if (TempSpawnPoint->CanSpawn())
+			{
+				RetSpawnPoint = TempSpawnPoint;
+			}
+		}
+	}
+
+	return RetSpawnPoint;
 }
 
 void UHB_WaveSubsystem::Tick(float DeltaTime)
@@ -126,6 +160,10 @@ void UHB_WaveSubsystem::ActiveWaveByIndex(int32 InWaveIndex,bool AutoNextWave)
 	CurrentlyWaveConfig = WaveData->GetWaveConfigByWaveIndex(InWaveIndex);
 	RemainingPreparatoryTime = CurrentlyWaveConfig.WaveInterval;
 	CurrentlyWaveEnemyConfigs = CurrentlyWaveConfig.EnemyConfigs;
+	for (FWaveEnemyConfig& EnemyConfig : CurrentlyWaveEnemyConfigs)
+	{
+		EnemyTotalCount += EnemyConfig.EnemyCount;
+	}
 	CurrentlyFightTime = 0;
 	bAutoNextWave = AutoNextWave;
 	WaveState = WS_Preparatory;
@@ -142,4 +180,14 @@ void UHB_WaveSubsystem::SkipPreparatory()
 		UE_LOG(LogWaveSubsystem, Error, TEXT("WaveState is not WS_Preparatory Cannot SkipPreparatory"));
 	}
 
+}
+
+void UHB_WaveSubsystem::OnEnemyDeath(AHB_Enemy_Base* Enemy)
+{
+	if (!IsValid(Enemy))
+	{
+		UE_LOG(LogWaveSubsystem, Error, TEXT("Enemy is not valid"));
+		return;
+	}
+	EnemyTotalCount -= 1;
 }

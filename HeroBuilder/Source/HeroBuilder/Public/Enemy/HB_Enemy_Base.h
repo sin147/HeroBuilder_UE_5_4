@@ -6,7 +6,7 @@
 #include "GameFramework/Character.h"
 #include "Component/HB_DamageComponent.h"
 #include "HB_Enemy_Base.generated.h"
-
+DECLARE_DELEGATE_OneParam(FOnEnemyDeath, AHB_Enemy_Base*/*Enemy*/);
 
 UCLASS()
 class HEROBUILDER_API AHB_Enemy_Base : public ACharacter
@@ -29,8 +29,6 @@ private:
 	float DeathTime=10;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	float AttackDistance=100;
-
-
 	float PreDamage = 0;
 	void UpdateHealth();
 protected:
@@ -41,7 +39,7 @@ public:
 	AHB_Enemy_Base();
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
 	bool IsDeath();
-
+	FOnEnemyDeath OnEnemyDeath;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

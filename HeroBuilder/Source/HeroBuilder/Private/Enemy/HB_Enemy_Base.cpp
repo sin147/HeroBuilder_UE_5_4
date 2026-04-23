@@ -4,6 +4,7 @@
 #include "Enemy/HB_Enemy_Base.h"
 #include "Net/Core/PropertyConditions/PropertyConditions.h"
 #include "Net/UnrealNetwork.h"
+#include "Subsystems/HB_WaveSubsystem.h"
 #include "AIController.h"
 
 void AHB_Enemy_Base::UpdateHealth()
@@ -26,6 +27,10 @@ AHB_Enemy_Base::AHB_Enemy_Base()
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 	DamageComponent = CreateDefaultSubobject<UHB_DamageComponent>(TEXT("DamageComponent"));
+	
+	// 设置 AI 控制器类
+	AIControllerClass = AAIController::StaticClass();
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
 
 bool AHB_Enemy_Base::IsDeath()
@@ -51,6 +56,7 @@ void AHB_Enemy_Base::BeginPlay()
 	{
 		DamageComponent->OnApplyDamage_Client.BindUObject(this, &AHB_Enemy_Base::OnClientApplyDamage);
 	}
+    OnEnemyDeath.BindUObject(GetWorld()->GetSubsystem<UHB_WaveSubsystem>(), &UHB_WaveSubsystem::OnEnemyDeath);
 }
 
 void AHB_Enemy_Base::OnServerApplyDamage(AActor* Attacker, float Damage)
@@ -72,6 +78,7 @@ void AHB_Enemy_Base::Death()
 		return;
 	}
 	bIsDead=true;
+	OnEnemyDeath.Execute(this);
 	FTimerHandle DeathTimer;
 	FTimerDelegate DeathDelegate;
 	DeathDelegate.BindLambda([this]()
@@ -112,7 +119,11 @@ void AHB_Enemy_Base::MoveToActor(AActor* TargetActor)
 		AAIController* AIController = Cast<AAIController>(GetController());
 		if (AIController)
 		{
-			AIController->MoveToActor(TargetActor, AttackDistance);
+			AIController->MoveToActor(TargetActor, AttackDistance,false);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("AIController is not valid"));
 		}
 	}
 	else
