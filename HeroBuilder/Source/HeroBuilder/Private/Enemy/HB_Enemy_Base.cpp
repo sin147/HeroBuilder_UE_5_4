@@ -5,7 +5,9 @@
 #include "Net/Core/PropertyConditions/PropertyConditions.h"
 #include "Net/UnrealNetwork.h"
 #include "Subsystems/HB_WaveSubsystem.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "AIController.h"
+using namespace EPathFollowingStatus;
 
 void AHB_Enemy_Base::UpdateHealth()
 {
@@ -88,12 +90,44 @@ void AHB_Enemy_Base::Death()
     GetWorld()->GetTimerManager().SetTimer(DeathTimer,DeathDelegate, DeathTime,false);
 }
 
+bool AHB_Enemy_Base::CanAttack(AActor* TargetActor)
+{
+	
+	return false;
+}
+
 // Called every frame
 void AHB_Enemy_Base::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	UpdateHealth();
-
+	//TODO
+	switch (CurrentState)
+	{
+	case EEnemyState::Idle:
+	{
+	
+		break;
+	}
+	case EEnemyState::Move:
+	{
+		AAIController* AIController = GetController<AAIController>();
+		if (AIController&& AIController->GetMoveStatus() != EPathFollowingStatus::Moving)
+		{
+            AIController->ResumeMove(AIController->GetCurrentMoveRequestID());
+		}
+		break;
+	}
+	case EEnemyState::Attack:
+	{
+		//TODO
+		break;
+	}
+	case EEnemyState::Death:
+		break;
+	default:
+		break;
+	}
 }
 
 // Called to bind functionality to input
@@ -113,8 +147,7 @@ void AHB_Enemy_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 void AHB_Enemy_Base::MoveToActor(AActor* TargetActor)
 {
-	ENetMode NetMode = GetWorld()->GetNetMode();
-	if (NetMode == NM_DedicatedServer || NetMode == NM_Standalone || NetMode == NM_ListenServer)
+	if (bIsServer)
 	{
 		AAIController* AIController = Cast<AAIController>(GetController());
 		if (AIController)
@@ -134,18 +167,47 @@ void AHB_Enemy_Base::MoveToActor(AActor* TargetActor)
 
 void AHB_Enemy_Base::MoveToLocation(FVector TargetLocation)
 {
-	ENetMode NetMode = GetWorld()->GetNetMode();
-	if (NetMode == NM_DedicatedServer || NetMode == NM_Standalone || NetMode == NM_ListenServer)
+	if (bIsServer)
 	{
 		AAIController* AIController = Cast<AAIController>(GetController());
 		if (AIController)
 		{
-			AIController->MoveToLocation(TargetLocation, AttackDistance);
+			 AIController->MoveToLocation(TargetLocation, AttackDistance,false);
 		}
 	}
 	else
 	{
 		UE_LOG(LogTemp, Error, TEXT("MoveToLocation is not supported in client"));
 	}
+}
+
+void AHB_Enemy_Base::StopMove()
+{
+
+	if (bIsServer)
+	{
+		AAIController* AIController = Cast<AAIController>(GetController());
+		if (AIController&& AIController->GetMoveStatus() != EPathFollowingStatus::Paused)
+		{
+            AIController->PauseMove(AIController->GetCurrentMoveRequestID());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("StopMove is not supported in client"));
+	}
+}
+
+void AHB_Enemy_Base::AttackToActor(AActor* TargetActor)
+{
+	if (bIsServer)
+	{
+		CurrentState = EEnemyState::Attack;
+	}
+}
+
+void AHB_Enemy_Base::AttackToLocation(FVector TargetLocation)
+{
+
 }
 
