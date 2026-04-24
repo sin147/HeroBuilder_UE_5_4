@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Component/HB_DamageComponent.h"
+#include "AIController.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "HB_Enemy_Base.generated.h"
 DECLARE_DELEGATE_OneParam(FOnEnemyDeath, AHB_Enemy_Base*/*Enemy*/);
 
@@ -13,7 +15,9 @@ enum class EEnemyState : uint8
 {
 	Idle UMETA(DisplayName = "Idle"),
 	Move UMETA(DisplayName = "Move"),
+	PreAttack UMETA(DisplayName = "PreAttack"),
 	Attack UMETA(DisplayName = "Attack"),
+	PostAttack UMETA(DisplayName = "PostAttack"),
 	Death UMETA(DisplayName = "Death")
 };
 
@@ -24,28 +28,28 @@ class HEROBUILDER_API AHB_Enemy_Base : public ACharacter
 	GENERATED_BODY()
 private:
 	//血量
-	UPROPERTY(Replicated)
+	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
     float Health=100;
 	//攻击力
-	UPROPERTY(Replicated)
+	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
 	float Attack=10;
     //最大血量
-	UPROPERTY(EditAnywhere, Category = "Attribute")
+	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
     float MaxHealth=100;
 	//是否死亡
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess=true))
-	bool bIsDead=false;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	float DeathTime=10;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	float AttackDistance=100;
 	float PreDamage = 0;
+	AActor* Target;
 	void UpdateHealth();
 	TObjectPtr<AAIController> AIController;
 protected:
 	bool bIsServer;
-    UPROPERTY(BlueprintReadOnly, Category = "Enemy State")
+	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
     EEnemyState CurrentState;
+	bool SwitchState(EEnemyState NewState);
 public:
 	// Sets default values for this character's properties
 	AHB_Enemy_Base();
@@ -63,6 +67,23 @@ protected:
 	void Death();
 	//可以攻击
 	bool CanAttack(AActor* TargetActor);
+	//攻击延迟
+	UPROPERTY(EditAnywhere, Category = "Attribute|Attack")
+	float AttackPreDelay = 1.0f;
+	UPROPERTY(EditAnywhere, Category = "Attribute|Attack")
+	float AttackPostDelay = 1.0f;
+	float CurrentAttackDelay = 0.0f;
+
+	//攻击表现
+	UFUNCTION(BlueprintImplementableEvent)
+    void OnPreAttack();
+
+	//攻击表现
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnPostAttack();
+	//攻击表现
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnAttack();
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -74,20 +95,16 @@ public:
 
 	//移动到目标Actor
 	UFUNCTION(BlueprintCallable)
-	void MoveToActor(AActor* TargetActor);
-
-    //移动到目标位置
-    UFUNCTION(BlueprintCallable)
-    void MoveToLocation(FVector TargetLocation);
+	void StartMove();
 
 	UFUNCTION(BlueprintCallable)
 	void StopMove();
 
 	UFUNCTION(BlueprintCallable)
-	void AttackToActor(AActor* TargetActor);
+	void StartAttack();
 
 	UFUNCTION(BlueprintCallable)
-    void AttackToLocation(FVector TargetLocation);
+	void StopAttack();
 
 
 };
