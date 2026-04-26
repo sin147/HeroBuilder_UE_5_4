@@ -27,29 +27,17 @@ class HEROBUILDER_API AHB_Enemy_Base : public ACharacter
 {
 	GENERATED_BODY()
 private:
-	//血量
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-    float Health=100;
-	//攻击力
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	float Attack=10;
-    //最大血量
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-    float MaxHealth=100;
 	//是否死亡
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	float DeathTime=10;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
-	float AttackDistance=100;
-	float PreDamage = 0;
+	float CombatRange=100;
 	AActor* Target;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
     TSubclassOf<AActor> TargetClass;
-
-	void UpdateHealth();
 	TObjectPtr<AAIController> AIController;
+	FTimerHandle DeathTimer;
 protected:
-	bool bIsServer;
 	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
     EEnemyState CurrentState;
 	bool SwitchState(EEnemyState NewState);
@@ -62,14 +50,10 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	//当服务器应用伤害
-	void OnServerApplyDamage(AActor* Attacker, float Damage);
     //当客户端应用伤害
     void OnClientApplyDamage(AActor* Attacker, float Damage);
 	//服务端死亡
 	void Death();
-	//可以攻击
-	bool CanAttack(AActor* TargetActor);
 	//攻击延迟
 	UPROPERTY(EditAnywhere, Category = "Attribute|Attack")
 	float AttackPreDelay = 1.0f;
