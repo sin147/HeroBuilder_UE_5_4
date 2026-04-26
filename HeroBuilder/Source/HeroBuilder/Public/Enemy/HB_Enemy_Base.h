@@ -43,6 +43,9 @@ private:
 	float AttackDistance=100;
 	float PreDamage = 0;
 	AActor* Target;
+	UPROPERTY(EditAnywhere, Category = "Attribute")
+    TSubclassOf<AActor> TargetClass;
+
 	void UpdateHealth();
 	TObjectPtr<AAIController> AIController;
 protected:

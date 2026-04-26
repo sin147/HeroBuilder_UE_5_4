@@ -6,6 +6,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Subsystems/HB_WaveSubsystem.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "../../HeroBuilderCharacter.h"
+#include "Kismet/GameplayStatics.h"
 
 void AHB_Enemy_Base::UpdateHealth()
 {
@@ -33,6 +35,15 @@ bool AHB_Enemy_Base::SwitchState(EEnemyState NewState)
 	{
 		UE_LOG(LogTemp, Verbose, TEXT("SwitchState: Already in state %d"), static_cast<uint8>(NewState));
 		return false;  // 状态未变，静默失败
+	}
+	if(!IsValid(Target))
+	{
+       Target= UGameplayStatics::GetActorOfClass(this, TargetClass);
+	   if(!IsValid(Target))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("SwitchState: Cannot find target"));
+			return false;
+		}
 	}
 	CurrentState = NewState;
 	return true;
@@ -75,7 +86,7 @@ void AHB_Enemy_Base::BeginPlay()
 		DamageComponent->OnApplyDamage_Client.BindUObject(this, &AHB_Enemy_Base::OnClientApplyDamage);
 	}
     OnEnemyDeath.BindUObject(GetWorld()->GetSubsystem<UHB_WaveSubsystem>(), &UHB_WaveSubsystem::OnEnemyDeath);
-	if(AIController&&Target)
+	if(AIController)
 	{
 		AIController->MoveToActor(Target,AttackDistance);
 		SwitchState(EEnemyState::Move);
