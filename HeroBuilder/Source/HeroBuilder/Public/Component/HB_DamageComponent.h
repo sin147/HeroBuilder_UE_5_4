@@ -8,7 +8,6 @@
 #include "HB_DamageComponent.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogDamageComponent, Log, All);
-DECLARE_DELEGATE_TwoParams(FOnApplyDamage_Server, AActor*/*Attacker*/, float/*Damage*/);
 DECLARE_DELEGATE_TwoParams(FOnApplyDamage_Client, AActor*/*Attacker*/, float/*Damage*/);
 DECLARE_DELEGATE(FOnDeath_Server);
 
@@ -22,7 +21,6 @@ public:
 	UHB_DamageComponent();
 	FOnApplyDamage_Client OnApplyDamage_Client;
 	FOnDeath_Server OnDeath_Server;
-	bool IsDeath();
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -40,12 +38,13 @@ protected:
 	float PreDamage = 0.f;
 	UPROPERTY(Replicated,EditAnywhere, BlueprintReadWrite, Category = "Damage")
 	float Attack = 10.f;
-	UPROPERTY(Replicated)
-	bool bIsDeath = false;
+
 	bool bIsServer;
 public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	UPROPERTY(Replicated)
+	bool bIsDeath = false;
 };

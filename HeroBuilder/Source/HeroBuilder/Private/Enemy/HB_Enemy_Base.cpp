@@ -46,7 +46,7 @@ AHB_Enemy_Base::AHB_Enemy_Base()
 
 bool AHB_Enemy_Base::IsDeath()
 {
-	return CurrentState == EEnemyState::Death;
+	return DamageComponent->bIsDeath;
 }
 
 // Called when the game starts or when spawned
@@ -129,13 +129,16 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			{
 				// 有暂停的路径，恢复
 				AIController->ResumeMove(AIController->GetCurrentMoveRequestID());
+				UE_LOG(LogTemp, Log, TEXT("Resuming paused move"));
 			}
 			else if (Status == EPathFollowingStatus::Idle)
 			{
 				// 没有路径，重新发起
-				if (IsValid(Target)&&!Target->GetComponentByClass<UHB_DamageComponent>()->IsDeath())
+				UHB_DamageComponent* DamageComp = Target->GetComponentByClass<UHB_DamageComponent>();
+				if (IsValid(Target)&&!IsValid(DamageComp) && DamageComp->bIsDeath)
 				{
 					AIController->MoveToActor(Target, CombatRange);
+					UE_LOG(LogTemp, Log, TEXT("Re-issuing move to target"));
 				}
 				else
 				{
@@ -159,6 +162,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			if (FMath::IsNearlyEqual(CurrentAttackDelay, AttackPreDelay, KINDA_SMALL_NUMBER))
 			{
 				OnPreAttack();
+				UE_LOG(LogTemp, Log, TEXT("PreAttack"));
 			}
 			CurrentAttackDelay -= DeltaTime;
 			if (CurrentAttackDelay <= 0)
@@ -179,6 +183,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 				AIController->PauseMove(AIController->GetCurrentMoveRequestID());
 			}
 			OnAttack();
+			UE_LOG(LogTemp, Log, TEXT("Attack"));
 			if (FMath::IsNearlyEqual(AttackPostDelay, 0.0f, KINDA_SMALL_NUMBER) && FMath::IsNearlyEqual(AttackPreDelay, 0.0f, KINDA_SMALL_NUMBER))
 			{
 				// 双零延迟：保持 Attack 状态，Tick 每帧持续调用 OnAttack
@@ -209,6 +214,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			if (FMath::IsNearlyEqual(CurrentAttackDelay, AttackPostDelay, KINDA_SMALL_NUMBER))
 			{
 				OnPostAttack();
+				UE_LOG(LogTemp, Log, TEXT("PostAttack"));
 			}
 			CurrentAttackDelay -= DeltaTime;
 			if (CurrentAttackDelay <= 0.0f)
@@ -231,6 +237,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			if (IsValid(AIController) && AIController->GetMoveStatus() == EPathFollowingStatus::Moving)
 			{
 				AIController->PauseMove(AIController->GetCurrentMoveRequestID());
+				UE_LOG(LogTemp, Log, TEXT("Idle"));
 			}
 			break;
 		}
@@ -256,25 +263,31 @@ void AHB_Enemy_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 void AHB_Enemy_Base::StartMove()
 {
-	if (HasAuthority() && CurrentState != EEnemyState::Move)
+	if (HasAuthority())
 	{
-		if (!IsValid(Target)) //后续需要添加是否死亡
+		if (CurrentState != EEnemyState::Move)
 		{
-			return;
+
+			if (!IsValid(AIController))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("StartMove: AIController is not valid, trying to get it"));
+				AIController = GetController<AAIController>();
+			}
+			if (!IsValid(AIController))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("StartMove: No valid AIController"));
+				return;
+			}
+			if (SwitchState(EEnemyState::Move) && AIController->GetMoveStatus() != EPathFollowingStatus::Paused)
+			{
+				AIController->MoveToActor(Target, CombatRange);
+			}
+
 		}
-		if (!IsValid(AIController))
+		else
 		{
-			AIController = GetController<AAIController>();
+			UE_LOG(LogTemp, Error, TEXT("Currently Is Move"));
 		}
-		if (!IsValid(AIController))
-		{
-			return;
-		}
-		if (AIController->GetMoveStatus() != EPathFollowingStatus::Paused)
-		{
-			AIController->MoveToActor(Target, CombatRange);
-		}
-        SwitchState(EEnemyState::Move);
 	}
 	else
 	{
@@ -284,10 +297,17 @@ void AHB_Enemy_Base::StartMove()
 
 void AHB_Enemy_Base::StopMove()
 {
-
-	if (HasAuthority() && CurrentState == EEnemyState::Move)
+	if (HasAuthority())
 	{
-        SwitchState(EEnemyState::Idle);
+
+		if (CurrentState == EEnemyState::Move)
+		{
+			SwitchState(EEnemyState::Idle);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Currently Is Not Move"));
+		}
 	}
 	else
 	{
@@ -297,16 +317,23 @@ void AHB_Enemy_Base::StopMove()
 
 void AHB_Enemy_Base::StartAttack()
 {
-	if (HasAuthority() && CurrentState != EEnemyState::Attack && CurrentState!=EEnemyState::PreAttack && CurrentState!=EEnemyState::PostAttack)
+	if (HasAuthority())
 	{
-		if (FMath::IsNearlyZero(AttackPreDelay))
+		if (CurrentState != EEnemyState::Attack && CurrentState != EEnemyState::PreAttack && CurrentState != EEnemyState::PostAttack)
 		{
-			SwitchState(EEnemyState::Attack);
+			if (FMath::IsNearlyZero(AttackPreDelay))
+			{
+				SwitchState(EEnemyState::Attack);
+			}
+			else
+			{
+				CurrentAttackDelay = AttackPreDelay;
+				SwitchState(EEnemyState::PreAttack);
+			}
 		}
 		else
 		{
-			CurrentAttackDelay = AttackPreDelay;
-			SwitchState(EEnemyState::PreAttack);
+			UE_LOG(LogTemp, Error, TEXT("Currently Is Attak"));
 		}
 	}
 	else
@@ -317,9 +344,16 @@ void AHB_Enemy_Base::StartAttack()
 
 void AHB_Enemy_Base::StopAttack()
 {
-	if (HasAuthority() && CurrentState == EEnemyState::Attack)
+	if(HasAuthority())
 	{
-        SwitchState(EEnemyState::Idle);
+		if (CurrentState == EEnemyState::Attack || CurrentState == EEnemyState::PreAttack || CurrentState == EEnemyState::PostAttack)
+		{
+			SwitchState(EEnemyState::Idle);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Currently Is Not Attack"));
+		}
 	}
 	else
 	{

@@ -150,7 +150,7 @@ void UHB_DamageSubsystem::Tick(float DeltaTime)
 			UHB_DamageComponent* DamageComp = Cast<UHB_DamageComponent>(DamageInfo.Target->GetComponentByClass(UHB_DamageComponent::StaticClass()));
             if (DamageComp)
             {
-                DamageComp->Server_ApplyDamage(DamageInfo.Attacker, DamageInfo.Damage);
+                DamageComp->ApplyDamage(DamageInfo.Attacker, DamageInfo.Damage);
             }
 		}
 		

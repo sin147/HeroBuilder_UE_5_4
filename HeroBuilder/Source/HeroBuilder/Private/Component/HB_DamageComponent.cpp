@@ -43,6 +43,7 @@ void UHB_DamageComponent::ApplyDamage(AActor* Attacker, float Damage)
 	{
 		PreDamage += Damage;
 		NetMulticast_ApplyDamage(Attacker, Damage);
+		UE_LOG(LogTemp, Log, TEXT("PreDamage %lf"), Damage);
 	}
 
 }
@@ -52,6 +53,7 @@ void UHB_DamageComponent::TakeDamage(AActor* Target, float Damage)
 	if (bIsServer)
 	{
 		GetWorld()->GetSubsystem<UHB_DamageSubsystem>()->TakeDamage(GetOwner(), Damage, Target);
+		UE_LOG(LogTemp, Log, TEXT("TakeDamage %lf"), Damage);
 	}
 
 }
@@ -61,13 +63,15 @@ void UHB_DamageComponent::TakeDamage(AActor* Target, float Damage)
 void UHB_DamageComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (!FMath::IsNearlyZero(PreDamage, KINDA_SMALL_NUMBER))
+	if (bIsServer&&!bIsDeath && !FMath::IsNearlyZero(PreDamage, KINDA_SMALL_NUMBER))
 	{
 		Health = FMath::Clamp(Health - PreDamage, 0, MaxHealth);
+		UE_LOG(LogTemp, Log, TEXT("CurrentlyHealth %lf"), Health);
 		if (Health <= 0)
 		{
 			bIsDeath = true;
 			OnDeath_Server.ExecuteIfBound();
+			UE_LOG(LogTemp, Log, TEXT("Death"));
 		}
 		PreDamage = 0;
 	}

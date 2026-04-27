@@ -44,6 +44,7 @@ protected:
 public:
 	// Sets default values for this character's properties
 	AHB_Enemy_Base();
+	UPROPERTY(EditAnywhere)
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
 	bool IsDeath();
 	FOnEnemyDeath OnEnemyDeath;

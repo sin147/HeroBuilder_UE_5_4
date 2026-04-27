@@ -9,7 +9,7 @@
 #include "HB_Building_Base.generated.h"
 
 UENUM(BlueprintType)
-enum class EBuildingState : uint8
+enum EBuildingState : uint8
 {
 	Idle UMETA(DisplayName = "Idle"),
 	Rotate UMETA(DisplayName = "Rotate"),
@@ -25,16 +25,14 @@ class HEROBUILDER_API AHB_Building_Base : public AActor
 	GENERATED_BODY()
 
 private:
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	float Health;
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	float MaxHealth;
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	float Attack;
-	float PreDamage;
 	AActor* Target;
-	UPROPERTY(EditAnywhere, Category = "Attribute")
+	UPROPERTY(Replicated,meta=(AllowPrivateAccess=true))
 	TEnumAsByte<EBuildingState> CurrentState;
+	bool SwitchState(EBuildingState NewState);
+	float DeathTime = 10.f;
+	float PreAttackDelay = 1.f;
+	float PostAttackDelay = 1.f;
+	float CurrentAttackDelay = 0.f;
 public:	
 	// Sets default values for this actor's properties
 	AHB_Building_Base();
@@ -44,12 +42,38 @@ protected:
 	virtual void BeginPlay() override;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
+	UPROPERTY(EditAnywhere, Category = "Attribute")
+	TObjectPtr<UMeshComponent> RotateMesh;
+	UPROPERTY(EditAnywhere, Category = "Attribute")
+	TObjectPtr<UMeshComponent> BaseMesh;
 
-	void OnServerApplyDamage(AActor* Attacker, float Damage);
+	//当客户端应用伤害
 	void OnClientApplyDamage(AActor* Attacker, float Damage);
-	void RotateToTarget();
+	//服务端死亡
+	void Server_Death();
+	//攻击表现
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnPreAttack();
+
+	//攻击表现
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnPostAttack();
+	//攻击表现
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnAttack();
 
 	bool bIsServer;
+	UPROPERTY(Replicated,BlueprintReadOnly, Category = "Attribute", meta = (AllowPrivateAccess = true))
+	float RotateSpeed = 100.0f;
+
+	UFUNCTION(BlueprintCallable)
+	void StartRotate();
+	UFUNCTION(BlueprintCallable)
+	void StopRotate();
+	UFUNCTION(BlueprintCallable)
+    void StartAttack();
+    UFUNCTION(BlueprintCallable)
+    void StopAttack();
 
 public:	
 	// Called every frame
