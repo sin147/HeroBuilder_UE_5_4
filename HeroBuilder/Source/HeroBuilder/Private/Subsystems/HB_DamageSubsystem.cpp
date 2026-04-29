@@ -19,7 +19,7 @@ void UHB_DamageSubsystem::TakeDamage(AActor* Attacker, float Damage, AActor* Tar
 	}
 }
 
-void UHB_DamageSubsystem::TakeBoxRangeDamage(AActor* Attacker, float Damage, FVector StartLocation, FVector EndLocation, float Width, EDamageTargetType Target)
+void UHB_DamageSubsystem::TakeBoxRangeDamage(AActor* Attacker, float Damage, FVector StartLocation, FVector EndLocation, float Width, ETargetType Target)
 {
 	// 计算盒形长度（StartLocation到EndLocation的距离）
 	float Length = FVector::Distance(StartLocation, EndLocation);
@@ -43,13 +43,13 @@ void UHB_DamageSubsystem::TakeBoxRangeDamage(AActor* Attacker, float Damage, FVe
 
 	switch (Target)
 	{
-	case EDamageTargetType::Player:
+	case ETargetType::Player:
 		TraceProfile = FName("DamagePlayer"); // 使用Player碰撞profile
 		break;
-	case EDamageTargetType::Enemy:
+	case ETargetType::Enemy:
         TraceProfile = FName("DamageEnemy"); // 使用Enemy碰撞profile
 		break;
-	case EDamageTargetType::Environment:
+	case ETargetType::Environment:
         TraceProfile = FName("DamageEnvironment"); // 使用Environment碰撞profile
 		break;
 	default:
@@ -85,7 +85,7 @@ void UHB_DamageSubsystem::TakeBoxRangeDamage(AActor* Attacker, float Damage, FVe
 	}
 }
 
-void UHB_DamageSubsystem::TakeSphereRangeDamage(AActor* Attacker, float Damage, FVector Center, float Radius, EDamageTargetType Target)
+void UHB_DamageSubsystem::TakeSphereRangeDamage(AActor* Attacker, float Damage, FVector Center, float Radius, ETargetType Target)
 {
 	// 使用SphereTraceMultiByProfile检测球形范围内的所有碰撞
 	TArray<FHitResult> OutHits;
@@ -99,13 +99,13 @@ void UHB_DamageSubsystem::TakeSphereRangeDamage(AActor* Attacker, float Damage, 
 
 	switch (Target)
 	{
-	case EDamageTargetType::Player:
+	case ETargetType::Player:
         TraceProfile = FName("DamagePlayer"); // 使用Player碰撞profile
 		break;
-	case EDamageTargetType::Enemy:
+	case ETargetType::Enemy:
         TraceProfile = FName("DamageEnemy"); // 使用Enemy碰撞profile
 		break;
-	case EDamageTargetType::Environment:
+	case ETargetType::Environment:
         TraceProfile = FName("DamageEnvironment"); // 使用Environment碰撞profile
 		break;
 	default:

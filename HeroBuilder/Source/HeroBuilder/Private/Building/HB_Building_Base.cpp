@@ -3,14 +3,26 @@
 
 #include "Building/HB_Building_Base.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Kismet/GameplayStatics.h"
+
+// Sets default values
+AHB_Building_Base::AHB_Building_Base()
+{
+	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = true;
+	bReplicates = true;
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
+	DamageComponent = CreateDefaultSubobject<UHB_DamageComponent>(TEXT("DamageComponent"));
+	RotateMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RotateMesh"));
+	BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BaseMesh"));
+	RotateMesh->SetupAttachment(RootComponent);
+	BaseMesh->SetupAttachment(RootComponent);
+	bIsServer = GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer;
+}
 
 bool AHB_Building_Base::SwitchState(EBuildingState NewState)
 {
-    if(CurrentState == NewState)
-	{
-		return false;
-	}
-	if(CurrentState == EBuildingState::Death)
+    if(CurrentState == NewState|| CurrentState == EBuildingState::Death)
 	{
 		return false;
 	}
@@ -18,15 +30,7 @@ bool AHB_Building_Base::SwitchState(EBuildingState NewState)
 	return true;
 }
 
-// Sets default values
-AHB_Building_Base::AHB_Building_Base()
-{
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-	bReplicates = true;
-	DamageComponent = CreateDefaultSubobject<UHB_DamageComponent>(TEXT("DamageComponent"));
-	bIsServer = GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer;
-}
+
 
 // Called when the game starts or when spawned
 void AHB_Building_Base::BeginPlay()
@@ -115,7 +119,17 @@ void AHB_Building_Base::Server_Death()
 
 void AHB_Building_Base::StartRotate()
 {
+    if (!IsValid(Target) || !IsValid(Target->GetComponentByClass<UHB_DamageComponent>()) || Target->GetComponentByClass<UHB_DamageComponent>()->bIsDeath)
+    {
+        Target = UGameplayStatics::GetActorOfClass(this, TargetClass);
+	}
+	if (!IsValid(Target))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No valid target found for rotation."));
+		return;
+	}
 	SwitchState(EBuildingState::Rotate);
+
 }
 
 void AHB_Building_Base::StopRotate()

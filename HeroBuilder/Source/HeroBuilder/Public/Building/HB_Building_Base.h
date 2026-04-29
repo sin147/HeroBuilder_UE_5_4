@@ -43,9 +43,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
-	TObjectPtr<UMeshComponent> RotateMesh;
+	TObjectPtr<UStaticMeshComponent> RotateMesh;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
-	TObjectPtr<UMeshComponent> BaseMesh;
+	TObjectPtr<UStaticMeshComponent> BaseMesh;
 
 	//当客户端应用伤害
 	void OnClientApplyDamage(AActor* Attacker, float Damage);
@@ -74,6 +74,8 @@ protected:
     void StartAttack();
     UFUNCTION(BlueprintCallable)
     void StopAttack();
+	UPROPERTY(EditAnywhere, Category = "Attribute")
+	TSubclassOf<AActor> TargetClass;
 
 public:	
 	// Called every frame

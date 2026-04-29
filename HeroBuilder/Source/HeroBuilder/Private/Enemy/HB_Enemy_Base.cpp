@@ -19,15 +19,6 @@ bool AHB_Enemy_Base::SwitchState(EEnemyState NewState)
 		UE_LOG(LogTemp, Verbose, TEXT("SwitchState: Already in state %d"), static_cast<uint8>(NewState));
 		return false;  // 状态未变，静默失败
 	}
-	if(!IsValid(Target))
-	{
-       Target= UGameplayStatics::GetActorOfClass(this, TargetClass);
-	   if(!IsValid(Target))
-		{
-			UE_LOG(LogTemp, Warning, TEXT("SwitchState: Cannot find target"));
-			return false;
-		}
-	}
 	CurrentState = NewState;
 	return true;
 }
@@ -113,18 +104,23 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 	//TODO
 	if (HasAuthority())
 	{
+		// 确保 AIController 有效
+		if (!IsValid(AIController))
+		{
+			AIController = GetController<AAIController>();
+
+			if (!IsValid(AIController))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Tick: No valid AIController found"));
+				return;
+			}
+		}
+		const EPathFollowingStatus::Type Status = AIController->GetMoveStatus();
+
 		switch (CurrentState)
 		{
 		case EEnemyState::Move:
 		{
-			if (!IsValid(AIController))
-			{
-				AIController = GetController<AAIController>();
-			}
-			if (!IsValid(AIController)) break;
-
-			const EPathFollowingStatus::Type Status = AIController->GetMoveStatus();
-
 			if (Status == EPathFollowingStatus::Paused)
 			{
 				// 有暂停的路径，恢复
@@ -133,17 +129,24 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			}
 			else if (Status == EPathFollowingStatus::Idle)
 			{
-				// 没有路径，重新发起
-				UHB_DamageComponent* DamageComp = Target->GetComponentByClass<UHB_DamageComponent>();
-				if (IsValid(Target)&&!IsValid(DamageComp) && DamageComp->bIsDeath)
+				if(IsValid(Target))
 				{
 					AIController->MoveToActor(Target, CombatRange);
-					UE_LOG(LogTemp, Log, TEXT("Re-issuing move to target"));
 				}
 				else
 				{
-					// Target 没了，不该在 Move 状态
-					SwitchState(EEnemyState::Idle);
+					//尝试寻找新的目标TODO
+                    Target = UGameplayStatics::GetActorOfClass(this, TargetClass);
+                    if (IsValid(Target))
+                    {
+                        AIController->MoveToActor(Target, CombatRange);
+                    }
+					else
+					{
+						UE_LOG(LogTemp, Warning, TEXT("Tick Move: No valid target found"));
+						// 没有目标，保持 Idle 状态，等待下一次 Tick 继续寻找
+						SwitchState(EEnemyState::Idle);
+					}
 				}
 			}
 			// Moving 什么都不做
@@ -151,11 +154,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		}
 		case EEnemyState::PreAttack:
 		{
-			if (!IsValid(AIController))
-			{
-				AIController = GetController<AAIController>();
-			}
-			if (IsValid(AIController) && AIController->GetMoveStatus() == EPathFollowingStatus::Moving)
+			if (Status == EPathFollowingStatus::Moving)
 			{
 				AIController->PauseMove(AIController->GetCurrentMoveRequestID());
 			}
@@ -168,17 +167,13 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			if (CurrentAttackDelay <= 0)
 			{
 				CurrentAttackDelay = AttackPostDelay;
-				SwitchState(EEnemyState::Attack);
+				SwitchState(EEnemyState::Idle);
 			}
 			break;
 		}
 		case EEnemyState::Attack:
 		{
-			if (!IsValid(AIController))
-			{
-				AIController = GetController<AAIController>();
-			}
-			if (IsValid(AIController) && AIController->GetMoveStatus() == EPathFollowingStatus::Moving)
+            if (Status == EPathFollowingStatus::Moving)
 			{
 				AIController->PauseMove(AIController->GetCurrentMoveRequestID());
 			}
@@ -203,11 +198,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		}
 		case EEnemyState::PostAttack:
 		{
-			if (!IsValid(AIController))
-			{
-				AIController = GetController<AAIController>();
-			}
-			if (IsValid(AIController) && AIController->GetMoveStatus() == EPathFollowingStatus::Moving)
+			if (Status == EPathFollowingStatus::Moving)
 			{
 				AIController->PauseMove(AIController->GetCurrentMoveRequestID());
 			}
@@ -230,11 +221,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		}
 		case EEnemyState::Idle:
 		{
-			if (!IsValid(AIController))
-			{
-				AIController = GetController<AAIController>();
-			}
-			if (IsValid(AIController) && AIController->GetMoveStatus() == EPathFollowingStatus::Moving)
+			if (Status == EPathFollowingStatus::Moving)
 			{
 				AIController->PauseMove(AIController->GetCurrentMoveRequestID());
 				UE_LOG(LogTemp, Log, TEXT("Idle"));
@@ -268,21 +255,7 @@ void AHB_Enemy_Base::StartMove()
 		if (CurrentState != EEnemyState::Move)
 		{
 
-			if (!IsValid(AIController))
-			{
-				UE_LOG(LogTemp, Warning, TEXT("StartMove: AIController is not valid, trying to get it"));
-				AIController = GetController<AAIController>();
-			}
-			if (!IsValid(AIController))
-			{
-				UE_LOG(LogTemp, Warning, TEXT("StartMove: No valid AIController"));
-				return;
-			}
-			if (SwitchState(EEnemyState::Move) && AIController->GetMoveStatus() != EPathFollowingStatus::Paused)
-			{
-				AIController->MoveToActor(Target, CombatRange);
-			}
-
+			SwitchState(EEnemyState::Move);
 		}
 		else
 		{
@@ -319,6 +292,36 @@ void AHB_Enemy_Base::StartAttack()
 {
 	if (HasAuthority())
 	{
+		//判断目标是否在攻击范围内TODO
+        if (FVector::Distance(GetActorLocation(), Target->GetActorLocation()) > CombatRange)
+        {
+            UE_LOG(LogTemp, Error, TEXT("StartAttack: Target is out of combat range"));
+			//查找范围内的目标TODO
+			FVector Center = GetActorLocation();
+			FVector EndLocation = Center; // SphereTraceMultiByProfile 不需要实际的结束位置，因为它会使用半径来定义范围
+            FName TraceProfile = "DamageEnemy";
+			TArray<FHitResult> OutHits;
+			UKismetSystemLibrary::SphereTraceMultiByProfile(
+				this,
+				Center,
+				EndLocation,
+				CombatRange,
+				TraceProfile, // 使用指定碰撞profile
+				false, // bTraceComplex
+				TArray<AActor*>(),
+				EDrawDebugTrace::None, // 不绘制调试线
+				OutHits,
+				true, // bIgnoreSelf
+				FLinearColor::Red,
+				FLinearColor::Green,
+                5.0f);
+			if (OutHits.Num() > 0)
+			{
+				Target = OutHits[0].GetActor();
+			}
+            return;
+        }
+
 		if (CurrentState != EEnemyState::Attack && CurrentState != EEnemyState::PreAttack && CurrentState != EEnemyState::PostAttack)
 		{
 			if (FMath::IsNearlyZero(AttackPreDelay))
