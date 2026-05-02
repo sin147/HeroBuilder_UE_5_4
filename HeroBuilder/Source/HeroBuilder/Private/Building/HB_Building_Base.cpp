@@ -5,6 +5,15 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/GameplayStatics.h"
 
+void AHB_Building_Base::FindAnyValidTarget()
+{
+	if(IsValidTarget(*Target))
+	{
+		return;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Try to find any valid target"));
+}
+
 // Sets default values
 AHB_Building_Base::AHB_Building_Base()
 {
@@ -50,58 +59,59 @@ void AHB_Building_Base::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	if (HasAuthority())
 	{
-		switch (CurrentState)
-		{
-		case EBuildingState::Idle:
-			break;
-		case EBuildingState::Rotate:
-		{
-			FVector TargetLocation = Target->GetActorLocation();
-			FVector CurrentLocation = GetActorLocation();
-			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(CurrentLocation, TargetLocation);
-			LookAtRotation.Pitch = 0;
-			LookAtRotation.Roll = 0;
-			RotateMesh->SetWorldRotation(FMath::RInterpTo(RotateMesh->GetComponentRotation(), LookAtRotation, DeltaTime, RotateSpeed));
-			break;
-		}
-		case EBuildingState::PreAttack:
-		{
-			if (CurrentAttackDelay > 0)
+			FindAnyValidTarget();
+			switch (CurrentState)
 			{
-				CurrentAttackDelay -= DeltaTime;
-			}
-			else
+			case EBuildingState::Idle:
+				break;
+			case EBuildingState::Rotate:
 			{
-				OnPreAttack();
-				SwitchState(EBuildingState::Attack);
+				FVector TargetLocation = Target->GetActorLocation();
+				FVector CurrentLocation = GetActorLocation();
+				FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(CurrentLocation, TargetLocation);
+				LookAtRotation.Pitch = 0;
+				LookAtRotation.Roll = 0;
+				RotateMesh->SetWorldRotation(FMath::RInterpTo(RotateMesh->GetComponentRotation(), LookAtRotation, DeltaTime, RotateSpeed));
+				break;
 			}
-			break;
-		}
-		case EBuildingState::Attack:
-		{
-			OnAttack();
-			CurrentAttackDelay = PostAttackDelay;
-			SwitchState(EBuildingState::PostAttack);
-			break;
-		}
-		case EBuildingState::PostAttack:
-		{
-			if (CurrentAttackDelay > 0)
+			case EBuildingState::PreAttack:
 			{
-				CurrentAttackDelay -= DeltaTime;
+				if (CurrentAttackDelay > 0)
+				{
+					CurrentAttackDelay -= DeltaTime;
+				}
+				else
+				{
+					OnPreAttack(Target);
+					SwitchState(EBuildingState::Attack);
+				}
+				break;
 			}
-			else
+			case EBuildingState::Attack:
 			{
-				OnPostAttack();
-				SwitchState(EBuildingState::Idle);
+				OnAttack(Target);
+				CurrentAttackDelay = PostAttackDelay;
+				SwitchState(EBuildingState::PostAttack);
+				break;
 			}
-			break;
-		}
-		case EBuildingState::Death:
-			break;
-		default:
-			break;
-		}
+			case EBuildingState::PostAttack:
+			{
+				if (CurrentAttackDelay > 0)
+				{
+					CurrentAttackDelay -= DeltaTime;
+				}
+				else
+				{
+					OnPostAttack(Target);
+					SwitchState(EBuildingState::Idle);
+				}
+				break;
+			}
+			case EBuildingState::Death:
+				break;
+			default:
+				break;
+			}
 	}
 }
 
@@ -119,15 +129,6 @@ void AHB_Building_Base::Server_Death()
 
 void AHB_Building_Base::StartRotate()
 {
-    if (!IsValid(Target) || !IsValid(Target->GetComponentByClass<UHB_DamageComponent>()) || Target->GetComponentByClass<UHB_DamageComponent>()->bIsDeath)
-    {
-        Target = UGameplayStatics::GetActorOfClass(this, TargetClass);
-	}
-	if (!IsValid(Target))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("No valid target found for rotation."));
-		return;
-	}
 	SwitchState(EBuildingState::Rotate);
 
 }
@@ -153,9 +154,16 @@ void AHB_Building_Base::StopAttack()
 	}
 }
 
+bool AHB_Building_Base::IsValidTarget(const AActor& InTarget) const
+{
+    return InTarget.GetComponentByClass<UHB_DamageComponent>() && !InTarget.GetComponentByClass<UHB_DamageComponent>()->bIsDeath && UKismetMathLibrary::Vector_Distance(GetActorLocation(), InTarget.GetActorLocation()) <= CombatRange;
+}
+
 void AHB_Building_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHB_Building_Base, CurrentState);
+	DOREPLIFETIME(AHB_Building_Base, Target);
+	DOREPLIFETIME(AHB_Building_Base, CombatRange);
 }
 

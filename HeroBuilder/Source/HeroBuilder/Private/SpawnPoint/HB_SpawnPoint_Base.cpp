@@ -3,6 +3,7 @@
 
 #include "SpawnPoint/HB_SpawnPoint_Base.h"
 
+
 // Sets default values
 AHB_SpawnPoint_Base::AHB_SpawnPoint_Base()
 {
@@ -18,6 +19,11 @@ void AHB_SpawnPoint_Base::BeginPlay()
 	RemainingSpawnBeforeDelay = SpawnBeforeDelay;
 	RemainingSpawnAfterDelay = SpawnAfterDelay;
 	NetMode = GetWorld()->GetNetMode();
+}
+
+void AHB_SpawnPoint_Base::OnSpawn(AActor* SpawnActor)
+{
+
 }
 
 // Called every frame
@@ -40,7 +46,8 @@ void AHB_SpawnPoint_Base::Tick(float DeltaTime)
 	}
 	case SS_Spawing:
 	{
-		GetWorld()->SpawnActor<AActor>(SpawnActorClass, GetActorLocation(), GetActorRotation());
+		
+		OnSpawn(GetWorld()->SpawnActor<AActor>(SpawnActorClass, GetActorLocation(), GetActorRotation()));
 		SpawnState = SS_After;
 		break;
 	}

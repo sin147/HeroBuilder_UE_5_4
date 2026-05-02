@@ -25,7 +25,8 @@ class HEROBUILDER_API AHB_Building_Base : public AActor
 	GENERATED_BODY()
 
 private:
-	AActor* Target;
+	UPROPERTY(Replicated)
+    TObjectPtr<AActor> Target;
 	UPROPERTY(Replicated,meta=(AllowPrivateAccess=true))
 	TEnumAsByte<EBuildingState> CurrentState;
 	bool SwitchState(EBuildingState NewState);
@@ -33,6 +34,9 @@ private:
 	float PreAttackDelay = 1.f;
 	float PostAttackDelay = 1.f;
 	float CurrentAttackDelay = 0.f;
+	UPROPERTY(EditAnywhere,Replicated, meta = (AllowPrivateAccess=true))
+	float CombatRange;
+    void FindAnyValidTarget();
 public:	
 	// Sets default values for this actor's properties
 	AHB_Building_Base();
@@ -53,14 +57,14 @@ protected:
 	void Server_Death();
 	//攻击表现
 	UFUNCTION(BlueprintImplementableEvent)
-	void OnPreAttack();
+	void OnPreAttack(AActor* InTarget);
 
 	//攻击表现
 	UFUNCTION(BlueprintImplementableEvent)
-	void OnPostAttack();
+	void OnPostAttack(AActor* InTarget);
 	//攻击表现
 	UFUNCTION(BlueprintImplementableEvent)
-	void OnAttack();
+	void OnAttack(AActor* InTarget);
 
 	bool bIsServer;
 	UPROPERTY(Replicated,BlueprintReadOnly, Category = "Attribute", meta = (AllowPrivateAccess = true))
@@ -76,6 +80,7 @@ protected:
     void StopAttack();
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	TSubclassOf<AActor> TargetClass;
+    bool IsValidTarget(const AActor& InTarget) const;
 
 public:	
 	// Called every frame

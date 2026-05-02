@@ -45,7 +45,6 @@ private:
 	TArray<TObjectPtr<AHB_SpawnPoint_Enemy>> SpawnPoints;
 	bool bAutoNextWave;
 	AHB_SpawnPoint_Enemy* GetAnRandSpawnPoint();
-	int32 EnemyTotalCount;
 public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { return TStatId(); }
@@ -53,5 +52,4 @@ public:
 	void ActiveWaveByIndex(int32 Index,bool AutoNextWave);
 	UFUNCTION(BlueprintCallable)
 	void SkipPreparatory();
-	void OnEnemyDeath(AHB_Enemy_Base* Enemy);
 };

@@ -45,6 +45,7 @@ protected:
 	void OnSpawnBefore();
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnSpawnAfter();
+	virtual void OnSpawn(AActor* SpawnActor);
 	TSubclassOf<AActor> SpawnActorClass;
 
 public:	

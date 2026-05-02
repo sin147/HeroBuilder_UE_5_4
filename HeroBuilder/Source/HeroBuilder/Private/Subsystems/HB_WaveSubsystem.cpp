@@ -3,6 +3,7 @@
 
 #include "Subsystems/HB_WaveSubsystem.h"
 #include "Enemy/HB_Enemy_Base.h"
+#include "Subsystems/HB_EnemySubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogWaveSubsystem);
 
@@ -85,8 +86,9 @@ void UHB_WaveSubsystem::WaveTick(float DeltaTime)
 				}
 			}
 		}
+
 		//还需要等待所有敌人被击杀TODO
-		if (IsSpawnOver&& EnemyTotalCount == 0)
+		if (IsSpawnOver&& GetWorld()->GetSubsystem<UHB_EnemySubsystem>()->GetEnemyNum() == 0)
 		{
 			WaveState = WS_End;
 			UE_LOG(LogWaveSubsystem, Log, TEXT("Enter EndState"));
@@ -160,10 +162,6 @@ void UHB_WaveSubsystem::ActiveWaveByIndex(int32 InWaveIndex,bool AutoNextWave)
 	CurrentlyWaveConfig = WaveData->GetWaveConfigByWaveIndex(InWaveIndex);
 	RemainingPreparatoryTime = CurrentlyWaveConfig.WaveInterval;
 	CurrentlyWaveEnemyConfigs = CurrentlyWaveConfig.EnemyConfigs;
-	for (FWaveEnemyConfig& EnemyConfig : CurrentlyWaveEnemyConfigs)
-	{
-		EnemyTotalCount += EnemyConfig.EnemyCount;
-	}
 	CurrentlyFightTime = 0;
 	bAutoNextWave = AutoNextWave;
 	WaveState = WS_Preparatory;
@@ -180,14 +178,4 @@ void UHB_WaveSubsystem::SkipPreparatory()
 		UE_LOG(LogWaveSubsystem, Error, TEXT("WaveState is not WS_Preparatory Cannot SkipPreparatory"));
 	}
 
-}
-
-void UHB_WaveSubsystem::OnEnemyDeath(AHB_Enemy_Base* Enemy)
-{
-	if (!IsValid(Enemy))
-	{
-		UE_LOG(LogWaveSubsystem, Error, TEXT("Enemy is not valid"));
-		return;
-	}
-	EnemyTotalCount -= 1;
 }

@@ -8,7 +8,6 @@
 #include "AIController.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "HB_Enemy_Base.generated.h"
-DECLARE_DELEGATE_OneParam(FOnEnemyDeath, AHB_Enemy_Base*/*Enemy*/);
 
 UENUM(BlueprintType)
 enum class EEnemyState : uint8
@@ -32,22 +31,24 @@ private:
 	float DeathTime=10;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	float CombatRange=100;
-	AActor* Target;
+	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	TObjectPtr<AActor> Target;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
     TSubclassOf<AActor> TargetClass;
 	TObjectPtr<AAIController> AIController;
 	FTimerHandle DeathTimer;
+	bool FindAnyValidTarget();
 protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
     EEnemyState CurrentState;
 	bool SwitchState(EEnemyState NewState);
+	bool IsValidTarget(const AActor& InTarget);
 public:
 	// Sets default values for this character's properties
 	AHB_Enemy_Base();
 	UPROPERTY(EditAnywhere)
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
 	bool IsDeath();
-	FOnEnemyDeath OnEnemyDeath;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -64,14 +65,14 @@ protected:
 
 	//攻击表现
 	UFUNCTION(BlueprintImplementableEvent)
-    void OnPreAttack();
+    void OnPreAttack(AActor* InTarget);
 
 	//攻击表现
 	UFUNCTION(BlueprintImplementableEvent)
-	void OnPostAttack();
+	void OnPostAttack(AActor* InTarget);
 	//攻击表现
 	UFUNCTION(BlueprintImplementableEvent)
-	void OnAttack();
+	void OnAttack(AActor* InTarget);
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -94,5 +95,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void StopAttack();
 
+	void SetTarget(TObjectPtr<AActor>InTarget);
 
 };

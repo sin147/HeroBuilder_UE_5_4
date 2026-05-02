@@ -6,6 +6,7 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "../../HeroBuilderCharacter.h"
 #include "Kismet/GameplayStatics.h"
+#include "Subsystems/HB_EnemySubsystem.h"
 
 bool AHB_Enemy_Base::SwitchState(EEnemyState NewState)
 {
@@ -21,6 +22,11 @@ bool AHB_Enemy_Base::SwitchState(EEnemyState NewState)
 	}
 	CurrentState = NewState;
 	return true;
+}
+
+bool AHB_Enemy_Base::IsValidTarget(const AActor& InTarget)
+{
+    return InTarget.GetComponentByClass<UHB_DamageComponent>()&& InTarget.GetComponentByClass<UHB_DamageComponent>()->bIsDeath == false;
 }
 
 // Sets default values
@@ -46,8 +52,6 @@ void AHB_Enemy_Base::BeginPlay()
 	Super::BeginPlay();
 	ENetMode NetMode=GetWorld()->GetNetMode();
 	AIController = GetController<AAIController>();
-
-    OnEnemyDeath.BindUObject(GetWorld()->GetSubsystem<UHB_WaveSubsystem>(), &UHB_WaveSubsystem::OnEnemyDeath);
 	if (IsValid(DamageComponent))
 	{
 		DamageComponent->OnDeath_Server.BindUObject(this, &AHB_Enemy_Base::Death);
@@ -82,7 +86,7 @@ void AHB_Enemy_Base::Death()
 	{
 		AIController->PauseMove(AIController->GetCurrentMoveRequestID());
 	}
-	OnEnemyDeath.ExecuteIfBound(this);
+	GetWorld()->GetSubsystem<UHB_EnemySubsystem>()->RemoveEnemy(this);
 	FTimerDelegate DeathDelegate;
 	TWeakObjectPtr<AHB_Enemy_Base> WeakThis(this);
 	DeathDelegate.BindLambda([WeakThis]()
@@ -96,7 +100,15 @@ void AHB_Enemy_Base::Death()
     GetWorld()->GetTimerManager().SetTimer(DeathTimer,DeathDelegate, DeathTime,false);
 	
 }
-
+bool AHB_Enemy_Base::FindAnyValidTarget()
+{
+	if (IsValidTarget(*Target))
+	{
+        return true;
+	}
+    UE_LOG(LogTemp, Warning, TEXT("Try to find any valid target"));
+    return false;
+}
 // Called every frame
 void AHB_Enemy_Base::Tick(float DeltaTime)
 {
@@ -104,6 +116,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 	//TODO
 	if (HasAuthority())
 	{
+
 		// 确保 AIController 有效
 		if (!IsValid(AIController))
 		{
@@ -111,12 +124,17 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 
 			if (!IsValid(AIController))
 			{
+				SwitchState(EEnemyState::Idle);
 				UE_LOG(LogTemp, Warning, TEXT("Tick: No valid AIController found"));
 				return;
 			}
 		}
+		
 		const EPathFollowingStatus::Type Status = AIController->GetMoveStatus();
-
+		if(FindAnyValidTarget()==false)
+		{
+			return;
+		}
 		switch (CurrentState)
 		{
 		case EEnemyState::Move:
@@ -129,25 +147,14 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			}
 			else if (Status == EPathFollowingStatus::Idle)
 			{
-				if(IsValid(Target))
+				if(FVector::Distance(GetActorLocation(), Target->GetActorLocation()) > CombatRange)
 				{
 					AIController->MoveToActor(Target, CombatRange);
 				}
 				else
 				{
-					//尝试寻找新的目标TODO
-                    Target = UGameplayStatics::GetActorOfClass(this, TargetClass);
-                    if (IsValid(Target))
-                    {
-                        AIController->MoveToActor(Target, CombatRange);
-                    }
-					else
-					{
-						UE_LOG(LogTemp, Warning, TEXT("Tick Move: No valid target found"));
-						// 没有目标，保持 Idle 状态，等待下一次 Tick 继续寻找
-						SwitchState(EEnemyState::Idle);
-					}
-				}
+					SwitchState(EEnemyState::Idle);
+                }
 			}
 			// Moving 什么都不做
             break;
@@ -160,14 +167,13 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			}
 			if (FMath::IsNearlyEqual(CurrentAttackDelay, AttackPreDelay, KINDA_SMALL_NUMBER))
 			{
-				OnPreAttack();
+				OnPreAttack(Target);
 				UE_LOG(LogTemp, Log, TEXT("PreAttack"));
 			}
 			CurrentAttackDelay -= DeltaTime;
 			if (CurrentAttackDelay <= 0)
 			{
-				CurrentAttackDelay = AttackPostDelay;
-				SwitchState(EEnemyState::Idle);
+				SwitchState(EEnemyState::Attack);
 			}
 			break;
 		}
@@ -177,7 +183,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			{
 				AIController->PauseMove(AIController->GetCurrentMoveRequestID());
 			}
-			OnAttack();
+			OnAttack(Target);
 			UE_LOG(LogTemp, Log, TEXT("Attack"));
 			if (FMath::IsNearlyEqual(AttackPostDelay, 0.0f, KINDA_SMALL_NUMBER) && FMath::IsNearlyEqual(AttackPreDelay, 0.0f, KINDA_SMALL_NUMBER))
 			{
@@ -190,10 +196,9 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			}
 			else
 			{
-				SwitchState(EEnemyState::PostAttack);
 				CurrentAttackDelay = AttackPostDelay;
+				SwitchState(EEnemyState::PostAttack);
 			}
-
 			break;
 		}
 		case EEnemyState::PostAttack:
@@ -204,14 +209,22 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 			}
 			if (FMath::IsNearlyEqual(CurrentAttackDelay, AttackPostDelay, KINDA_SMALL_NUMBER))
 			{
-				OnPostAttack();
+				OnPostAttack(Target);
 				UE_LOG(LogTemp, Log, TEXT("PostAttack"));
 			}
 			CurrentAttackDelay -= DeltaTime;
 			if (CurrentAttackDelay <= 0.0f)
 			{
-				CurrentAttackDelay = AttackPreDelay;
-				SwitchState(EEnemyState::PreAttack);
+				if(FMath::IsNearlyEqual(AttackPreDelay, 0.0f, KINDA_SMALL_NUMBER))
+				{
+					SwitchState(EEnemyState::Attack);
+				}
+				else
+				{
+					SwitchState(EEnemyState::PreAttack);
+					CurrentAttackDelay = AttackPreDelay;
+				}
+
 			}
 			break;
 		}
@@ -246,6 +259,7 @@ void AHB_Enemy_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AHB_Enemy_Base, CurrentState);
+	DOREPLIFETIME(AHB_Enemy_Base, Target);
 }
 
 void AHB_Enemy_Base::StartMove()
@@ -292,36 +306,6 @@ void AHB_Enemy_Base::StartAttack()
 {
 	if (HasAuthority())
 	{
-		//判断目标是否在攻击范围内TODO
-        if (FVector::Distance(GetActorLocation(), Target->GetActorLocation()) > CombatRange)
-        {
-            UE_LOG(LogTemp, Error, TEXT("StartAttack: Target is out of combat range"));
-			//查找范围内的目标TODO
-			FVector Center = GetActorLocation();
-			FVector EndLocation = Center; // SphereTraceMultiByProfile 不需要实际的结束位置，因为它会使用半径来定义范围
-            FName TraceProfile = "DamageEnemy";
-			TArray<FHitResult> OutHits;
-			UKismetSystemLibrary::SphereTraceMultiByProfile(
-				this,
-				Center,
-				EndLocation,
-				CombatRange,
-				TraceProfile, // 使用指定碰撞profile
-				false, // bTraceComplex
-				TArray<AActor*>(),
-				EDrawDebugTrace::None, // 不绘制调试线
-				OutHits,
-				true, // bIgnoreSelf
-				FLinearColor::Red,
-				FLinearColor::Green,
-                5.0f);
-			if (OutHits.Num() > 0)
-			{
-				Target = OutHits[0].GetActor();
-			}
-            return;
-        }
-
 		if (CurrentState != EEnemyState::Attack && CurrentState != EEnemyState::PreAttack && CurrentState != EEnemyState::PostAttack)
 		{
 			if (FMath::IsNearlyZero(AttackPreDelay))
@@ -362,4 +346,9 @@ void AHB_Enemy_Base::StopAttack()
 	{
 		UE_LOG(LogTemp, Error, TEXT("StopAttack is not supported in client"));
 	}
+}
+
+void AHB_Enemy_Base::SetTarget(TObjectPtr<AActor>InTarget)
+{
+	Target = InTarget;
 }
