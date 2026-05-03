@@ -4,6 +4,7 @@
 #include "Building/HB_Building_Base.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Subsystems/HB_BuildingSubsystem.h"
 
 void AHB_Building_Base::FindAnyValidTarget()
 {
@@ -11,7 +12,7 @@ void AHB_Building_Base::FindAnyValidTarget()
 	{
 		return;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("Try to find any valid target"));
+	GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->FindAnyVaildTarget(this);
 }
 
 // Sets default values
@@ -27,6 +28,11 @@ AHB_Building_Base::AHB_Building_Base()
 	RotateMesh->SetupAttachment(RootComponent);
 	BaseMesh->SetupAttachment(RootComponent);
 	bIsServer = GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer;
+}
+
+void AHB_Building_Base::SetTarget(AActor* InTarget)
+{
+    Target = InTarget;
 }
 
 bool AHB_Building_Base::SwitchState(EBuildingState NewState)

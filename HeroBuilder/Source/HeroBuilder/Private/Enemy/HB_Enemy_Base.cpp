@@ -106,7 +106,7 @@ bool AHB_Enemy_Base::FindAnyValidTarget()
 	{
         return true;
 	}
-    UE_LOG(LogTemp, Warning, TEXT("Try to find any valid target"));
+    GetWorld()->GetSubsystem<UHB_EnemySubsystem>()->FindAnyVaildTarget(this);
     return false;
 }
 // Called every frame

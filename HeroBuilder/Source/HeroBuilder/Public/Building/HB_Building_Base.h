@@ -40,6 +40,7 @@ private:
 public:	
 	// Sets default values for this actor's properties
 	AHB_Building_Base();
+	void SetTarget(AActor* InTarget);
 
 protected:
 	// Called when the game starts or when spawned

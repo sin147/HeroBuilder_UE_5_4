@@ -17,7 +17,6 @@ class HEROBUILDER_API UHB_EnemySubsystem : public UTickableWorldSubsystem
 private:
 	TArray<TObjectPtr<AHB_Enemy_Base>> EnemyArray;
 	TQueue<TObjectPtr<AHB_Enemy_Base>> NeedFindTargetEnemysQueue;
-	void Find(AHB_Enemy_Base* InEnemy);
 	int32 FindNumByTick = 20;
 public:
 	void FindAnyVaildTarget(AHB_Enemy_Base*InEnemy);
