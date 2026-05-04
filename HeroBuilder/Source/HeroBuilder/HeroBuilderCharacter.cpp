@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "HeroBuilderCharacter.h"
 #include "Engine/LocalPlayer.h"
@@ -8,6 +8,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
 #include "EnhancedInputComponent.h"
+#include "Subsystems/HB_ConstructionSubsystem.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 
@@ -60,6 +61,11 @@ void AHeroBuilderCharacter::BeginPlay()
 	Super::BeginPlay();
 }
 
+FVector AHeroBuilderCharacter::GetFollowCameraForward()
+{
+	return FollowCamera->GetForwardVector();
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Input
 
@@ -86,6 +92,9 @@ void AHeroBuilderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AHeroBuilderCharacter::Look);
+
+		// Construction Mode
+        EnhancedInputComponent->BindAction(ChangeConstructionModeAction, ETriggerEvent::Started, this, &AHeroBuilderCharacter::ChangeConstructionMode);
 	}
 	else
 	{
@@ -126,5 +135,48 @@ void AHeroBuilderCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void AHeroBuilderCharacter::ChangeConstructionMode(const FInputActionValue& Value)
+{
+	if (CurrentlyState == EPCS_ConstructionMode)
+	{
+		CurrentlyState == EPCS_None;
+	}
+	else
+	{
+		CurrentlyState = EPCS_ConstructionMode;
+	}
+	bool bEnable=CurrentlyState == EPCS_ConstructionMode;
+	if (HasAuthority())
+	{
+		Server_ConstructionMode(bEnable);
+	}
+	Client_ConstructionMode(bEnable);
+	UE_LOG(LogTemplateCharacter, Log, TEXT("ConstructionMode"));
+}
+
+void AHeroBuilderCharacter::Client_ConstructionMode(bool bEnable)
+{
+	if (bEnable)
+	{
+		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Client_ActiveConstructionMode(this);
+	}
+	else
+	{
+		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Client_CancelConstructionMode(this);
+	}
+}
+
+void AHeroBuilderCharacter::Server_ConstructionMode_Implementation(bool bEnable)
+{
+	if (bEnable)
+	{
+		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Server_ActiveConstructionMode(this);
+	}
+	else
+	{
+		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Server_CancelConstructionMode(this);
 	}
 }

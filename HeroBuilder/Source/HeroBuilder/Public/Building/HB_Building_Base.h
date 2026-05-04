@@ -81,7 +81,7 @@ protected:
     void StopAttack();
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	TSubclassOf<AActor> TargetClass;
-    bool IsValidTarget(const AActor& InTarget) const;
+    bool IsValidTarget(const AActor* InTarget) const;
 
 public:	
 	// Called every frame

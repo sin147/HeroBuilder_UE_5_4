@@ -24,9 +24,9 @@ bool AHB_Enemy_Base::SwitchState(EEnemyState NewState)
 	return true;
 }
 
-bool AHB_Enemy_Base::IsValidTarget(const AActor& InTarget)
+bool AHB_Enemy_Base::IsValidTarget(const AActor* InTarget)
 {
-    return InTarget.GetComponentByClass<UHB_DamageComponent>()&& InTarget.GetComponentByClass<UHB_DamageComponent>()->bIsDeath == false;
+    return IsValid(InTarget)&&InTarget->GetComponentByClass<UHB_DamageComponent>()&& InTarget->GetComponentByClass<UHB_DamageComponent>()->bIsDeath == false;
 }
 
 // Sets default values
@@ -102,7 +102,7 @@ void AHB_Enemy_Base::Death()
 }
 bool AHB_Enemy_Base::FindAnyValidTarget()
 {
-	if (IsValidTarget(*Target))
+	if (IsValidTarget(Target))
 	{
         return true;
 	}

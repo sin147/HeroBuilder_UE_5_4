@@ -33,7 +33,10 @@ void UHB_EnemySubsystem::Tick(float DeltaTime)
 					TargetDistancePair.Value = Distance;
 				}
 			}
-			OutItem->SetTarget(Cast<AActor>(TargetDistancePair.Key));
+			if (IsValid(Cast<AActor>(TargetDistancePair.Key)))
+			{
+				OutItem->SetTarget(Cast<AActor>(TargetDistancePair.Key));
+			}
 		}
 	}
 }

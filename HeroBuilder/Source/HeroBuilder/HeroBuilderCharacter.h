@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -15,10 +15,19 @@ struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
+UENUM(BlueprintType)
+enum EPlayerCharacterState:uint8
+{
+	EPCS_None ,
+    EPCS_ConstructionMode,
+};
+
 UCLASS(config=Game)
 class AHeroBuilderCharacter : public ACharacter
 {
 	GENERATED_BODY()
+
+	TEnumAsByte<EPlayerCharacterState> CurrentlyState= EPCS_None;
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -44,6 +53,9 @@ class AHeroBuilderCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ChangeConstructionModeAction;
+
 public:
 	AHeroBuilderCharacter();
 	
@@ -56,6 +68,11 @@ protected:
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 			
+	void ChangeConstructionMode(const FInputActionValue& Value);
+
+	UFUNCTION(Server,Reliable)
+	void Server_ConstructionMode(bool bEnable);
+	void Client_ConstructionMode(bool bEnable);
 
 protected:
 	// APawn interface
@@ -69,5 +86,6 @@ public:
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+	FVector GetFollowCameraForward();
 };
 

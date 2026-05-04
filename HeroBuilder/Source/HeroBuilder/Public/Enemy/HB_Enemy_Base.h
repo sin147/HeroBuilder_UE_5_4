@@ -42,7 +42,7 @@ protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
     EEnemyState CurrentState;
 	bool SwitchState(EEnemyState NewState);
-	bool IsValidTarget(const AActor& InTarget);
+	bool IsValidTarget(const AActor* InTarget);
 public:
 	// Sets default values for this character's properties
 	AHB_Enemy_Base();

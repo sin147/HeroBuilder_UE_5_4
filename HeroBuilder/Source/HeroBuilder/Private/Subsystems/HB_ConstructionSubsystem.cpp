@@ -4,6 +4,7 @@
 #include "Subsystems/HB_ConstructionSubsystem.h"
 #include "Subsystems/HB_BuildingSubsystem.h"
 #include "Engine/StaticMeshActor.h"
+#include "../HeroBuilderCharacter.h"
 #include "Building/HB_Building_Base.h"
 
 DEFINE_LOG_CATEGORY(LogConstructionSubsystem);
@@ -11,7 +12,7 @@ DEFINE_LOG_CATEGORY(LogConstructionSubsystem);
 void UHB_ConstructionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-    BuildingData = LoadObject<UBuildingData>(this, TEXT("/Game/Config/DA_BuildConfig"));
+    BuildingData = LoadObject<UBuildingData>(this, TEXT("/Game/Config/DA_BuildingConfig"));
 
     if (!IsValid(BuildingData))
 	{
@@ -22,63 +23,82 @@ void UHB_ConstructionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		UE_LOG(LogConstructionSubsystem, Log, TEXT("Successfully loaded WaveData asset"));
 	}
+	NetMode = GetWorld()->GetNetMode();
 }
 
 void UHB_ConstructionSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	TickSpawnBuilding();
-	switch (ConstructionState)
+	if (NetMode != NM_Client)
 	{
-	case EConstructionState_None:
-		break;
-	case EConstructionState_Preview:
-		break;
-	case EConstructionState_Spawn:
-		break;
-	default:
-		break;
+		TickSpawnBuilding();
 	}
+	if (NetMode == NM_Client || NetMode == NM_Standalone)
+	{
+		TickPreviewBuilding();
+	}
+
 }
 
 void UHB_ConstructionSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> BuildingClass, FVector SpawnLocation, FRotator SpawnRotation)
 {
-	if (BuildingClass)
+	if (NetMode!=NM_Client&&BuildingClass)
 	{
 		PreSpawnQueue.Enqueue(FBuildingSpawnInfo(BuildingClass, SpawnLocation, SpawnRotation));
 	}
-}
-
-void UHB_ConstructionSubsystem::StartPreviewBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass)
-{
-	if (InOwnerCharacter && InBuildingClass)
+	else
 	{
-		ConstructionState = EConstructionState_Preview;
-		CreatePreviewBuilding(InOwnerCharacter, InBuildingClass);
+		UE_LOG(LogConstructionSubsystem, Warning, TEXT("SpawnBuilding called on client"));
 	}
 }
 
-void UHB_ConstructionSubsystem::StopPreviewBuilding(ACharacter* InOwnerCharacter)
+void UHB_ConstructionSubsystem::SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass)
 {
-	ConstructionState = EConstructionState_None;
-	for (FBuildingPreviewInfo TempBuildingPreviewInfo : PreviewBuildings)
+	if (IsValid(BuildingData))
 	{
-		if (TempBuildingPreviewInfo.OwnerCharacter == InOwnerCharacter)
-		{
-			TempBuildingPreviewInfo.PreivewMesh->Destroy();
-			PreviewBuildings.Remove(TempBuildingPreviewInfo);
-			break;
-		}
+		BuildingPreviewInfo.PreivewMesh->GetStaticMeshComponent()->SetStaticMesh(BuildingData->GetPreviewMeshByBuildingClass(InBuildingClass));
 	}
+	else
+	{
+		UE_LOG(LogConstructionSubsystem, Warning, TEXT("BuildingData is not valid"));
+	}
+
 }
 
-void UHB_ConstructionSubsystem::CreatePreviewBuilding(TObjectPtr<ACharacter> InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass)
+void UHB_ConstructionSubsystem::Client_ActiveConstructionMode(ACharacter* InCharacter)
 {
-	TObjectPtr<AStaticMeshActor> PreviewMesh =GetWorld()->SpawnActor<AStaticMeshActor>();
-	PreviewMesh->GetStaticMeshComponent()->SetStaticMesh(BuildingData->GetPreviewMeshByBuildingClass(InBuildingClass));
-	PreviewBuildings.Add(FBuildingPreviewInfo(InOwnerCharacter, PreviewMesh, InBuildingClass));
+	if (IsValid(BuildingData))
+	{
+		// 客户端预览模型
+		BuildingPreviewInfo.OwnerCharacter = InCharacter;
+		BuildingPreviewInfo.PreivewMesh = GetWorld()->SpawnActor<AStaticMeshActor>();
+		BuildingPreviewInfo.PreivewMesh->SetActorEnableCollision(false);
+		BuildingPreviewInfo.PreivewMesh->SetMobility(EComponentMobility::Movable);
+		BuildingPreviewInfo.PreivewMesh->GetStaticMeshComponent()->SetStaticMesh(BuildingData->GetPreviewMeshByBuildingClass(AHB_Building_Base::StaticClass()));
+
+	}
+	else
+	{
+		UE_LOG(LogConstructionSubsystem, Warning, TEXT("BuildingData is not valid"));
+	}
+
 }
 
+void UHB_ConstructionSubsystem::Server_ActiveConstructionMode(ACharacter* InCharacter)
+{
+	//仅添加数据
+
+}
+
+void UHB_ConstructionSubsystem::Client_CancelConstructionMode(ACharacter* InCharacter)
+{
+	BuildingPreviewInfo.PreivewMesh->Destroy();
+	BuildingPreviewInfo.PreivewMesh = nullptr;
+}
+
+void UHB_ConstructionSubsystem::Server_CancelConstructionMode(ACharacter* InCharacter)
+{
+}
 void UHB_ConstructionSubsystem::TickSpawnBuilding()
 {
 	if (!PreSpawnQueue.IsEmpty())
@@ -126,6 +146,22 @@ void UHB_ConstructionSubsystem::TickSpawnBuilding()
 			}
 		}
 	}
+}
+
+void UHB_ConstructionSubsystem::TickPreviewBuilding()
+{
+	if (IsValid(BuildingPreviewInfo.PreivewMesh))
+	{
+		AHeroBuilderCharacter* OwnerCharacter = Cast<AHeroBuilderCharacter>(BuildingPreviewInfo.OwnerCharacter);
+		FVector PreviewLocation = OwnerCharacter->GetActorLocation() + OwnerCharacter->GetFollowCameraForward() * 200;
+		if (IsValid(OwnerCharacter))
+		{
+			int32 Y = FMath::Floor(PreviewLocation.Y / GridSize);
+			int32 X = FMath::Floor(PreviewLocation.X / GridSize);
+			BuildingPreviewInfo.PreivewMesh->SetActorLocation(FVector(GridSize * X + GridSize / 2, GridSize * Y + GridSize / 2, GridHeight));
+		}
+	}
+		
 }
 
 FBuildingPreviewInfo::FBuildingPreviewInfo(TObjectPtr<ACharacter> InOwnerCharacter, TObjectPtr<AStaticMeshActor> InPreivewMesh, TSubclassOf<AHB_Building_Base> InBuildingClass)

@@ -8,7 +8,7 @@
 
 void AHB_Building_Base::FindAnyValidTarget()
 {
-	if(IsValidTarget(*Target))
+	if(IsValidTarget(Target))
 	{
 		return;
 	}
@@ -160,9 +160,9 @@ void AHB_Building_Base::StopAttack()
 	}
 }
 
-bool AHB_Building_Base::IsValidTarget(const AActor& InTarget) const
+bool AHB_Building_Base::IsValidTarget(const AActor* InTarget) const
 {
-    return InTarget.GetComponentByClass<UHB_DamageComponent>() && !InTarget.GetComponentByClass<UHB_DamageComponent>()->bIsDeath && UKismetMathLibrary::Vector_Distance(GetActorLocation(), InTarget.GetActorLocation()) <= CombatRange;
+    return IsValid(InTarget)&&InTarget->GetComponentByClass<UHB_DamageComponent>() && !InTarget->GetComponentByClass<UHB_DamageComponent>()->bIsDeath;
 }
 
 void AHB_Building_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -44,6 +44,18 @@ public:
 	TObjectPtr<ACharacter> OwnerCharacter;
 	TObjectPtr<AStaticMeshActor> PreivewMesh;
 	TSubclassOf<AHB_Building_Base> BuildingClass;
+	bool operator==(const FBuildingPreviewInfo& Other) const { return OwnerCharacter == Other.OwnerCharacter; }
+};
+
+USTRUCT(BlueprintType)
+struct FGridInfo
+{
+	GENERATED_BODY()
+public:
+	int32 X;
+    int32 Y;
+	TObjectPtr<AHB_Building_Base> Building;
+
 };
 
 /**
@@ -54,19 +66,27 @@ class HEROBUILDER_API UHB_ConstructionSubsystem : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
 private:
+	float GridSize=400;
+	float GridHeight=100;
+	TArray<FGridInfo> GridInfos;
 	TObjectPtr<UBuildingData> BuildingData;
     TQueue<FBuildingSpawnInfo> PreSpawnQueue;
-	TArray<FBuildingPreviewInfo> PreviewBuildings;
+	FBuildingPreviewInfo BuildingPreviewInfo;
 	TArray<TObjectPtr<AHB_Building_Base>> Buildings;
 	int32 SpawnNumByTick;
-    void CreatePreviewBuilding(TObjectPtr<ACharacter> InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
 	TEnumAsByte<EConstructionState> ConstructionState = EConstructionState::EConstructionState_None;
 	void TickSpawnBuilding();
+	void TickPreviewBuilding();
+	ENetMode NetMode;
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { return TStatId(); }
     void SpawnBuilding(TSubclassOf<AHB_Building_Base> BuildingClass, FVector SpawnLocation, FRotator SpawnRotation);
-	void StartPreviewBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
-	void StopPreviewBuilding(ACharacter* InOwnerCharacter);
+	void SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
+
+	void Client_ActiveConstructionMode(ACharacter*InCharacter);
+	void Server_ActiveConstructionMode(ACharacter*InCharacter);
+	void Client_CancelConstructionMode(ACharacter*InCharacter);
+	void Server_CancelConstructionMode(ACharacter*InCharacter);
 };
