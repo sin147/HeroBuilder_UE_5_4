@@ -36,9 +36,6 @@ private:
 	//待销毁的建筑
 	TQueue<TObjectPtr<AHB_Building_Base>> DestroyBuildingQueue;
 	int32 DestroyNumByTick = 20;
-	void TickDestroyBuilding();
-
-    
 public:
 	/*************************************外部接口*****************************************/
 	//生成建筑

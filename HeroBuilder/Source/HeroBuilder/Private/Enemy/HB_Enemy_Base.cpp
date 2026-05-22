@@ -82,6 +82,7 @@ void AHB_Enemy_Base::ApplyDamage(AActor* Attacker, float Damage)
 	{
 		SwitchState(EEnemyState::ES_Death);
 		AIController->StopMovement();
+		OnDeath();
 	}
 }
 // Called every frame

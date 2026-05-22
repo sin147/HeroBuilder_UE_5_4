@@ -77,6 +77,11 @@ protected:
 	//攻击表现
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnAttack(AActor* InTarget);
+	//死亡表现
+
+    UFUNCTION(BlueprintImplementableEvent)
+
+    void OnDeath();
 
 	virtual void ApplyDamage(AActor* Attacker, float Damage) override;
 public:	

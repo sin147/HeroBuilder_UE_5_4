@@ -286,6 +286,7 @@ void AHB_Building_Base::ApplyDamage(AActor* Attacker, float Damage)
     if (CurrentHealth <= 0)
     {
 		SwitchState(EBuildingState::BS_Death);
+		OnDeath();
     }
 }
 

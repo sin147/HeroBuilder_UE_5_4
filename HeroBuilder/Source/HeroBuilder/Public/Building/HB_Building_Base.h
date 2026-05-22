@@ -94,6 +94,8 @@ protected:
 	TSubclassOf<AActor> TargetClass;
     bool IsValidTarget(AActor* InTarget) const;
 	virtual void ApplyDamage(AActor* Attacker, float Damage) override;
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnDeath();
 public:	
 	void InitialBuilding(FBuildingConfig InConfig);
 	void SetTarget(AActor* InTarget);
