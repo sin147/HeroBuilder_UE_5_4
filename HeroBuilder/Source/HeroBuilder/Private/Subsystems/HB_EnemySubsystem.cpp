@@ -56,7 +56,7 @@ void UHB_EnemySubsystem::TickFindTarget()
 {
     if (NetMode != ENetMode::NM_Client && !FindTargetEnemyQueue.IsEmpty())
 	{
-		TArray<TObjectPtr<AHB_Building_Base>> BuildingArray = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetAllBuilding();
+		TArray<TObjectPtr<AHB_Building_Base>> BuildingArray = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetAllValidBuilding();
 		float CurrentlyFindNum = 0;
 		//遍历队列,找到最近的建筑
         while(!FindTargetEnemyQueue.IsEmpty() && CurrentlyFindNum < FindNumByTick)

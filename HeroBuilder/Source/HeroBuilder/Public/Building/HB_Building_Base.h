@@ -44,6 +44,11 @@ private:
 	float MaxHealth = 100.f;
 	float CombatRange=1000;
 	bool WasFindTarget = false;
+	UPROPERTY(Replicated, ReplicatedUsing = OnRep_Rotation)
+	FRotator RotateMeshRotation;
+	UFUNCTION()
+	void OnRep_Rotation();
+
 	// Sets default values for this actor's properties
 	AHB_Building_Base();
 
@@ -100,8 +105,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// 命名常量
-	static constexpr float MIN_ATTACK_ANGLE = 0.95f;
-	static constexpr float TARGET_CHECK_INTERVAL = 0.5f;
+	static constexpr float MIN_ATTACK_ANGLE = 0.98f;
 
 	// 状态名称辅助函数
 	FString GetStateName(EBuildingState State);

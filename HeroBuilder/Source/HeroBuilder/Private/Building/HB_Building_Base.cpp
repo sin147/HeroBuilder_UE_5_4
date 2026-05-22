@@ -10,6 +10,11 @@
 
 DEFINE_LOG_CATEGORY(LogBuilding);
 
+void AHB_Building_Base::OnRep_Rotation()
+{
+	RotateMesh->SetWorldRotation(RotateMeshRotation);
+}
+
 // Sets default values
 AHB_Building_Base::AHB_Building_Base()
 {
@@ -138,7 +143,7 @@ void AHB_Building_Base::Tick(float DeltaTime)
 			}
 				
 			RotateMesh->SetWorldRotation(FMath::RInterpTo(CurrentRotation, LookAtRotation, DeltaTime, DynamicRotateSpeed));
-
+			RotateMeshRotation = RotateMesh->GetComponentRotation();
 			// 计算朝向相似度，大于MIN_ATTACK_ANGLE时开始攻击
 			FVector CurrentForward = RotateMesh->GetForwardVector();
 			CurrentForward.Z = 0; // 忽略Z轴分量
@@ -290,4 +295,5 @@ void AHB_Building_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AHB_Building_Base, CurrentState);
 	DOREPLIFETIME(AHB_Building_Base, Target);
 	DOREPLIFETIME(AHB_Building_Base, CurrentHealth);
+    DOREPLIFETIME(AHB_Building_Base, RotateMeshRotation);
 }
