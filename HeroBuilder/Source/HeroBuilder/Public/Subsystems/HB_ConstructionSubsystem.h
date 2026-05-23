@@ -27,6 +27,7 @@ private:
 	TMap<TObjectPtr<ACharacter>, TSubclassOf<AHB_Building_Base>> BuildingClassMap;
 	ENetMode NetMode;
 	void TickPreviewBuildingPos();
+	bool bCanConstruction(ACharacter* InCharacter);
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Tick(float DeltaTime) override;

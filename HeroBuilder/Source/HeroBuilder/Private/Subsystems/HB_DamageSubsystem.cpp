@@ -49,8 +49,11 @@ void UHB_DamageSubsystem::TakeBoxRangeDamage(AActor* Attacker, float Damage, FVe
 	case ETargetType::Enemy:
         TraceProfile = FName("DamageEnemy"); // 使用Enemy碰撞profile
 		break;
-	case ETargetType::Environment:
-        TraceProfile = FName("DamageEnvironment"); // 使用Environment碰撞profile
+	case ETargetType::Resource:
+        TraceProfile = FName("DamageResource"); // 使用Resource碰撞profile
+		break;
+	case ETargetType::Building:
+		TraceProfile = FName("DamageBuilding"); // 使用Building碰撞profile
 		break;
 	default:
 		break;
@@ -105,8 +108,11 @@ void UHB_DamageSubsystem::TakeSphereRangeDamage(AActor* Attacker, float Damage, 
 	case ETargetType::Enemy:
         TraceProfile = FName("DamageEnemy"); // 使用Enemy碰撞profile
 		break;
-	case ETargetType::Environment:
-        TraceProfile = FName("DamageEnvironment"); // 使用Environment碰撞profile
+	case ETargetType::Resource:
+        TraceProfile = FName("DamageResource"); // 使用Environment碰撞profile
+		break;
+	case ETargetType::Building:
+		TraceProfile = FName("DamageBuilding"); // 使用Building碰撞profile
 		break;
 	default:
 		break;

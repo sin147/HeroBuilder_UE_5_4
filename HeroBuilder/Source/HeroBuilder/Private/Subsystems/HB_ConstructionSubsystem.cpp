@@ -63,7 +63,10 @@ void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
 	if (NetMode != NM_Client)
 	{
 		AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingMeshActorMap[InCharacter];
-		GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuilding(BuildingClassMap[InCharacter], FTransform(TargetPreStaticMeshActor->GetActorRotation(), TargetPreStaticMeshActor->GetActorLocation(), TargetPreStaticMeshActor->GetActorScale()));
+		if (bCanConstruction(InCharacter))
+		{
+			GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuilding(BuildingClassMap[InCharacter], FTransform(TargetPreStaticMeshActor->GetActorRotation(), TargetPreStaticMeshActor->GetActorLocation(), TargetPreStaticMeshActor->GetActorScale()));
+		}
 	}
 }
 
@@ -131,9 +134,52 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 			FVector PreviewLocation = PlayerCharacter->GetActorLocation() + PlayerCharacter->GetFollowCameraForward() * 200;
 			int32 Y = FMath::Floor(PreviewLocation.Y / GridWidth);
 			int32 X = FMath::Floor(PreviewLocation.X / GridWidth);
-			BuildingMeshActor->SetActorLocation(FVector(GridWidth * X + GridWidth / 2, GridWidth * Y + GridWidth / 2, GridHeight));
+			BuildingMeshActor->SetActorLocation(FVector(GridWidth * X + GridWidth / 2, GridWidth * Y + GridWidth / 2, 0));
 		}
 	}
+}
+
+bool UHB_ConstructionSubsystem::bCanConstruction(ACharacter* InCharacter)
+{
+	AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
+	AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingMeshActorMap[InCharacter];
+	FVector CheckLocation = TargetPreStaticMeshActor->GetActorLocation();
+
+    int32 Y = FMath::Floor(CheckLocation.Y / GridWidth);
+
+    int32 X = FMath::Floor(CheckLocation.X / GridWidth);
+
+	FVector StartLocation((X + 0.5) * GridWidth, (Y + 0.5) * GridWidth, GridHeight * 0.5);
+
+	// 计算盒形范围
+	FVector HalfSize(GridWidth * 0.5f, GridWidth * 0.5f, GridHeight * 0.5f);
+
+	// 使用BoxTraceMultiByProfile检测盒形范围内的所有碰撞
+	FHitResult OutHit;
+	TArray<AActor*> ActorsToIgnore;
+
+	FName TraceProfile = FName("Construction");
+
+	if (UKismetSystemLibrary::BoxTraceSingleByProfile(
+		this,
+		StartLocation,
+		StartLocation,
+		HalfSize,
+		FRotator::ZeroRotator,
+		TraceProfile, // 使用指定碰撞profile
+		false, // bTraceComplex
+		ActorsToIgnore,
+		EDrawDebugTrace::None, // 不绘制调试线
+		OutHit,
+		true, // bIgnoreSelf
+		FLinearColor::Red,
+		FLinearColor::Green,
+		5.0f))
+	{
+		return false;
+	}
+
+	return true;
 }
 
 void APreviewBuildingActor::OnRep_Mesh()

@@ -19,7 +19,8 @@ enum ETargetType : int8
 {
 	Player UMETA(DisplayName = "玩家"),
     Enemy UMETA(DisplayName = "敌人"),
-    Environment UMETA(DisplayName = "环境"),
+    Resource UMETA(DisplayName = "环境"),
+	Building UMETA(DisplayName = "建筑"),
 };
 
 /**

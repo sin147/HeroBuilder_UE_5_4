@@ -8,7 +8,7 @@
 #include "HB_GridSubsystem.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogGridSubsystem, Log, All);
-
+class AHB_Building_Base;
 
 /**
  * 
