@@ -6,7 +6,6 @@
 #include "Enemy/HB_Enemy_Base.h"
 #include "Manager/HB_BuildingManager.h"
 #include "Subsystems/HB_EnemySubsystem.h"
-#include "Subsystems/HB_NotifySubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogBuildingSystem);
 
@@ -129,11 +128,7 @@ void UHB_BuildingSubsystem::TickSpawnBuilding()
 					GetManager<AHB_BuildingManager>()->AddBuilding(DeferredBuilding);
 					DeferredBuilding->FinishSpawning(OutItem.Value);
 
-					// 发送新建筑生成通知，让所有敌人重新寻找目标
-					if (UHB_NotifySubsystem* NotifySubsystem = GetWorld()->GetSubsystem<UHB_NotifySubsystem>())
-					{
-						NotifySubsystem->SendToServer(NotifyNames::ON_SPAWN_BUILDING);
-					}
+					OnSpawnBuilding.Broadcast(DeferredBuilding,OutItem.Value);
 				}
 				else
 				{
@@ -183,6 +178,7 @@ void UHB_BuildingSubsystem::DestroyBuilding(AHB_Building_Base*InBuilding)
 	{
 		UE_LOG(LogBuildingSystem, Warning, TEXT("Attempted to destroy invalid building"));
 	}
+	OnDestroyBuilding.Broadcast(InBuilding, InBuilding->GetActorTransform());
 	GetManager<AHB_BuildingManager>()->RemoveBuilding(InBuilding);
 	InBuilding->Destroy();
 }

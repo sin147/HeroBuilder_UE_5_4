@@ -60,7 +60,7 @@ public:
 	void AddAllEnemiesToFindTargetQueue();
 	// 新建筑生成通知回调
 	UFUNCTION()
-	void OnSpawnBuildingNotify(const FString& Notify);
+	void OnSpawnBuilding(AHB_Building_Base* NewBuilding,FTransform SpawnTransform);
 public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { return TStatId(); }

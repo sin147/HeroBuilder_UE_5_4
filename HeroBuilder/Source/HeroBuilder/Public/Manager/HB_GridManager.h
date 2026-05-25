@@ -7,14 +7,11 @@
 #include "HB_GridManager.generated.h"
 
 class AHB_Building_Base;
-class AHB_Enemy_Base;
+class AHB_Resource_Base;
 USTRUCT(BlueprintType)
 struct FGridInfo
 {
 	GENERATED_BODY()
-private:
-	TObjectPtr<AHB_Building_Base> Building;
-	TArray<TObjectPtr<AHB_Enemy_Base>> Enemies;
 public:
 	FGridInfo() {}
 	FGridInfo(int32 InX,int32 InY):X(InX),Y(InY){}
@@ -24,11 +21,6 @@ public:
 	{
 		return Other.X == X && Other.Y == Y;
 	}
-	TObjectPtr<AHB_Building_Base> GetBuilding();
-	bool SetBuilding(TObjectPtr<AHB_Building_Base> InBuilding);
-	TArray<TObjectPtr<AHB_Enemy_Base>> GetEnemies();
-	bool AddEnemy(TObjectPtr<AHB_Enemy_Base> InEnemy);
-	bool RemoveEnemy(TObjectPtr<AHB_Enemy_Base> InEnemy);
 };
 
 /**
@@ -40,9 +32,12 @@ class HEROBUILDER_API AHB_GridManager : public AHB_Base_Manager
 	GENERATED_BODY()
 private:
 	UPROPERTY(Replicated)
-	TArray<FGridInfo> GridInfos;
+	TArray<FGridInfo> UsedGridInfos;
+	TArray<FGridInfo> FreeGridInfos;
 public:
-	void SetGridInfo(int InX,int InY,AHB_Building_Base*InBuilding=nullptr);
-    bool GetGridInfo(FGridInfo& OutGridInfo);
+	void CacheUsedGridInfo(int InX,int InY);
+	void RemoveUsedGridInfo(int InX, int InY);
+	TArray<FGridInfo> GetUsedGridInfo();
+	TArray<FGridInfo> GetFreeGridInfo();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

@@ -5,7 +5,6 @@
 #include "Enemy/HB_Enemy_Base.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Subsystems/HB_BuildingSubsystem.h"
-#include "Subsystems/HB_NotifySubsystem.h"
 #include "Building/HB_Building_Base.h"
 #include "Helper/HB_EnemyHelper.h"
 #include "Manager/HB_EnemyManager.h"
@@ -34,9 +33,9 @@ void UHB_EnemySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UHB_EnemySubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	// 订阅新建筑生成通知
-	if (UHB_NotifySubsystem* NotifySubsystem = GetWorld()->GetSubsystem<UHB_NotifySubsystem>())
+	if (UHB_BuildingSubsystem* BuildingSubsystem = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>())
 	{
-		NotifySubsystem->BindNotify(NotifyNames::ON_SPAWN_BUILDING, TEXT("OnSpawnBuildingNotify"), this);
+		BuildingSubsystem->OnSpawnBuilding.AddUObject(this,&UHB_EnemySubsystem::OnSpawnBuilding);
 	}
 }
 
@@ -206,7 +205,7 @@ void UHB_EnemySubsystem::AddAllEnemiesToFindTargetQueue()
 	UE_LOG(LogEnemySubsystem, Log, TEXT("Added all %d enemies to find target queue (new building spawned)"), AllEnemies.Num());
 }
 
-void UHB_EnemySubsystem::OnSpawnBuildingNotify(const FString& Notify)
+void UHB_EnemySubsystem::OnSpawnBuilding(AHB_Building_Base* NewBuilding, FTransform SpawnTransform)
 {
 	AddAllEnemiesToFindTargetQueue();
 }

@@ -9,7 +9,8 @@
 
 class AHB_Resource_Base;
 DECLARE_LOG_CATEGORY_EXTERN(LogResourceSubsystem, Log, All);
-
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnSpawnResource, AHB_Resource_Base* /*Resource*/, FTransform /*Transform*/);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnDestroyResource, AHB_Resource_Base* /*Resource*/, FTransform /*Transform*/);
 /**
  * 
  */
@@ -60,6 +61,8 @@ public:
 	//消耗资源数量
 	UFUNCTION(BlueprintCallable)
 	bool ConsumeResourceAmount(EResourceType InType, int32 InAmount);
+	FOnSpawnResource OnSpawnResource;
+	FOnDestroyResource OnDestroyResource;
 
 public:
 	virtual void Tick(float DeltaTime) override;

@@ -5,76 +5,29 @@
 #include "Building/HB_Building_Base.h"
 #include "Enemy/HB_Enemy_Base.h"
 
-void AHB_GridManager::SetGridInfo(int InX, int InY,AHB_Building_Base* InBuilding)
+void AHB_GridManager::CacheUsedGridInfo(int InX, int InY)
 {
-	FGridInfo DefaultGrid;
-	FGridInfo& TargetGrid= DefaultGrid;
-	if (!GridInfos.Contains(FGridInfo(InX, InY)))
-	{
-		GridInfos.Add(FGridInfo(InX, InY));
-	}
-	else
-	{
-		GridInfos.Find(TargetGrid);
-	}
-	TargetGrid.SetBuilding(InBuilding);
+	UsedGridInfos.AddUnique(FGridInfo(InX, InY));
+	FreeGridInfos.RemoveSingle(FGridInfo(InX, InY));
 }
 
-bool AHB_GridManager::GetGridInfo(FGridInfo &OutGridInfo)
+void AHB_GridManager::RemoveUsedGridInfo(int InX, int InY)
 {
-    for (auto& Pair : GridInfos)
-    {
-        if (Pair== OutGridInfo)
-        {
-            OutGridInfo = Pair;
-            return true;
-        }
-    }
-    return false;
+	UsedGridInfos.RemoveSingle(FGridInfo(InX, InY));
+	FreeGridInfos.AddUnique(FGridInfo(InX, InY));										
+}
+
+TArray<FGridInfo> AHB_GridManager::GetUsedGridInfo()
+{
+    return UsedGridInfos;
+}
+TArray<FGridInfo> AHB_GridManager::GetFreeGridInfo()
+{
+	return FreeGridInfos;
 }
 
 void AHB_GridManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AHB_GridManager, GridInfos);
-}
-
-TObjectPtr<AHB_Building_Base> FGridInfo::GetBuilding()
-{
-	return IsValid(Building) ? Building : nullptr;
-}
-
-bool FGridInfo::SetBuilding(TObjectPtr<AHB_Building_Base> InBuilding)
-{
-	if (IsValid(InBuilding))
-	{
-		Building = InBuilding;
-		return true;
-	}
-	return false;
-}
-
-TArray<TObjectPtr<AHB_Enemy_Base>> FGridInfo::GetEnemies()
-{
-    return Enemies;
-}
-
-bool FGridInfo::AddEnemy(TObjectPtr<AHB_Enemy_Base> InEnemy)
-{
-    if (IsValid(InEnemy))
-    {
-        Enemies.Add(InEnemy);
-        return true;
-    }
-	return false;
-}
-
-bool FGridInfo::RemoveEnemy(TObjectPtr<AHB_Enemy_Base> InEnemy)
-{
-    if (IsValid(InEnemy))
-    {
-        Enemies.Remove(InEnemy);
-        return true;
-    }
-	return false;
+	DOREPLIFETIME(AHB_GridManager, UsedGridInfos);
 }

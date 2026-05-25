@@ -132,9 +132,8 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 			AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(PreBuildingMeshActorPair.Key);
 			AStaticMeshActor* BuildingMeshActor = PreBuildingMeshActorPair.Value;
 			FVector PreviewLocation = PlayerCharacter->GetActorLocation() + PlayerCharacter->GetFollowCameraForward() * 200;
-			int32 Y = FMath::Floor(PreviewLocation.Y / GridWidth);
-			int32 X = FMath::Floor(PreviewLocation.X / GridWidth);
-			BuildingMeshActor->SetActorLocation(FVector(GridWidth * X + GridWidth / 2, GridWidth * Y + GridWidth / 2, 0));
+			FVector2D GridIndex = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->CalulateGridIndexByLocation(PreviewLocation);
+			BuildingMeshActor->SetActorLocation(FVector(GridWidth * GridIndex.X + GridWidth / 2, GridWidth * GridIndex.Y + GridWidth / 2, 0));
 		}
 	}
 }
@@ -144,12 +143,9 @@ bool UHB_ConstructionSubsystem::bCanConstruction(ACharacter* InCharacter)
 	AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
 	AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingMeshActorMap[InCharacter];
 	FVector CheckLocation = TargetPreStaticMeshActor->GetActorLocation();
+	FVector2D GridIndex = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->CalulateGridIndexByLocation(CheckLocation);
 
-    int32 Y = FMath::Floor(CheckLocation.Y / GridWidth);
-
-    int32 X = FMath::Floor(CheckLocation.X / GridWidth);
-
-	FVector StartLocation((X + 0.5) * GridWidth, (Y + 0.5) * GridWidth, GridHeight * 0.5);
+	FVector StartLocation((GridIndex.X + 0.5) * GridWidth, (GridIndex.Y + 0.5) * GridWidth, GridHeight * 0.5);
 
 	// 计算盒形范围
 	FVector HalfSize(GridWidth * 0.5f, GridWidth * 0.5f, GridHeight * 0.5f);

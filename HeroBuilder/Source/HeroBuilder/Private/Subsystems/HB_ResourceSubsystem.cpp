@@ -4,6 +4,7 @@
 #include "Resource/HB_Resource_Base.h"
 #include "Manager/HB_ResourceManager.h"
 #include "Helper/HB_ResourceHelper.h"
+#include "Subsystems/HB_GridSubsystem.h"
 #include "Config/ResourceData.h"
 
 DEFINE_LOG_CATEGORY(LogResourceSubsystem);
@@ -122,8 +123,19 @@ FTransform UHB_ResourceSubsystem::GetRandomSpawnTransform() const
 
 	const float RandX = FMath::FRandRange(-Extent.X, Extent.X);
 	const float RandY = FMath::FRandRange(-Extent.Y, Extent.Y);
-	const float RandZ = FMath::FRandRange(-Extent.Z, Extent.Z);
-	const FVector SpawnLocation = Center + FVector(RandX, RandY, RandZ);
+	FVector SpawnLocation = Center + FVector(RandX, RandY, 0);
+	FVector2D GridIndex= GetWorld()->GetSubsystem<UHB_GridSubsystem>()->CalulateGridIndexByLocation(SpawnLocation);
+	TArray<FGridInfo> UsedGrids=GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetUsedGridIndexs();
+	TArray<FGridInfo> FreeGrids = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetUsedGridIndexs();
+	if(UsedGrids.Contains(FGridInfo(GridIndex.X,GridIndex.Y)))
+	{
+		if (!FreeGrids.IsEmpty())
+		{
+			SpawnLocation=FVector(FreeGrids[0].X, FreeGrids[0].Y,0);
+		}
+		return GetRandomSpawnTransform();
+	}
+
 	const FRotator SpawnRotation = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
 	return FTransform(SpawnRotation, SpawnLocation);
 }

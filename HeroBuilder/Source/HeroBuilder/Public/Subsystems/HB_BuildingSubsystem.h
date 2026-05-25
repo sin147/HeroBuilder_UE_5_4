@@ -9,6 +9,8 @@
 #include "HB_BuildingSubsystem.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogBuildingSystem,Log,All)
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnSpawnBuilding, AHB_Building_Base* /*Building*/, FTransform /*Enemy*/);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnDestroyBuilding, AHB_Building_Base* /*Building*/, FTransform /*Enemy*/);
 
 class AHB_Building_Base;
 class AHB_Enemy_Base;
@@ -53,7 +55,8 @@ public:
     UStaticMesh* GetBuildingPreviewMesh(TSubclassOf<AHB_Building_Base> InClass);
 	//是否有效
 	bool IsValidBuilding(AHB_Building_Base* InBuilding);
-
+	FOnSpawnBuilding OnSpawnBuilding;
+	FOnDestroyBuilding OnDestroyBuilding;
 public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { return TStatId(); }
