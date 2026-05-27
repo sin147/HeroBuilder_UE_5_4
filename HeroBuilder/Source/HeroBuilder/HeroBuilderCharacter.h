@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "Component/HB_InteractComponent.h"
 #include "HeroBuilderCharacter.generated.h"
 
 class USpringArmComponent;
@@ -15,22 +16,16 @@ struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPlayerCharacter, Log, All);
 
-UENUM(BlueprintType)
-enum EPlayerCharacterInteractMode:uint8
-{
-	IM_None ,
-	IM_Normal,
-    IM_ConstructionMode,
-};
+
 UENUM(BlueprintType)
 enum EPlayerCharacterState :uint8
 {
 	EPCS_None,
 	EPCS_Idle,
 	EPCS_Move,
-	EPCS_PreAttack,
-	EPCS_Attack,
-    EPCS_PostAttack,
+	EPCS_PreInteract,
+	EPCS_Interact,
+    EPCS_PostInteract,
 };
 
 UCLASS(config=Game)
@@ -38,9 +33,10 @@ class AHeroBuilderCharacter : public ACharacter
 {
 	GENERATED_BODY()
 	UPROPERTY(Replicated)
-	TEnumAsByte<EPlayerCharacterInteractMode> CurrentlyInteractMode= IM_Normal;
-	UPROPERTY(Replicated)
 	TEnumAsByte<EPlayerCharacterState> CurrentlyState = EPCS_Idle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UHB_InteractComponent> InteractComponent;
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -71,10 +67,16 @@ class AHeroBuilderCharacter : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* InteractAction;
-	UFUNCTION(Server, Reliable)
-	void OnEnterInteractMode(EPlayerCharacterInteractMode EnterMode);
-	UFUNCTION(Server, Reliable)
-	void OnLeaveInteractMode(EPlayerCharacterInteractMode LeaveMode);
+
+	//交互前摇时间
+	UPROPERTY(Replicated,EditAnywhere, BlueprintReadWrite, Category = Interact, meta = (AllowPrivateAccess = "true"))
+	float PreInteractDelay = 0.3f;
+	//交互后摇时间
+    UPROPERTY(Replicated,EditAnywhere, BlueprintReadWrite, Category = Interact, meta = (AllowPrivateAccess = "true"))
+	float PostInteractDelay = 0.3f;
+	//内部用于前/后摇倒计时
+	float CurrentInteractDelay = 0.f;
+
 	UFUNCTION(Server,Reliable)
 	void Server_Attack();
 	void TickUpdateState(float DeltaTime);
@@ -84,8 +86,11 @@ class AHeroBuilderCharacter : public ACharacter
 	void OnLeaveState(EPlayerCharacterState LeaveState);
 public:
 	AHeroBuilderCharacter();
-	void SwitchInteractMode(EPlayerCharacterInteractMode NewMode);
 	void SwitchState(EPlayerCharacterState NewState);
+    void SetPreInteractDelay(float Delay);
+    void SetPostInteractDelay(float Delay);
+	UFUNCTION(BlueprintPure)
+	TEnumAsByte<EPlayerCharacterState> GetCurrentState() const { return CurrentlyState; }
 
 protected:
 
@@ -99,10 +104,12 @@ protected:
 
 	void Interact(const FInputActionValue& Value);
 
-	UFUNCTION(Server,Reliable)
-	void Server_ConstructionMode(bool bEnable);
+	//请求服务端切换交互模式
 	UFUNCTION(Server, Reliable)
-	void Server_ConstructionBegin(ACharacter* InCharacter);
+	void Server_SwitchInteractMode(uint8 NewMode);
+	//请求服务端触发交互
+	UFUNCTION(Server, Reliable)
+	void Server_TryInteract();
 
 protected:
 	// APawn interface

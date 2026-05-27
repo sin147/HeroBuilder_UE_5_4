@@ -8,51 +8,15 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
 #include "EnhancedInputComponent.h"
-#include "Subsystems/HB_ConstructionSubsystem.h"
+#include "Subsystems/HB_InteractSubsystem.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY(LogPlayerCharacter);
 
 //////////////////////////////////////////////////////////////////////////
 // AHeroBuilderCharacter
-
-void AHeroBuilderCharacter::OnEnterInteractMode_Implementation(EPlayerCharacterInteractMode EnterMode)
-{
-	switch (EnterMode)
-	{
-	case IM_None:
-		break;
-	case IM_Normal:
-		break;
-	case IM_ConstructionMode:
-		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Server_ActiveConstructionMode(this);
-		break;
-	default:
-		break;
-	}
-	CurrentlyInteractMode = EnterMode;
-	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Enter InteractMode '%d'!"), *GetNameSafe(this), EnterMode);
-}
-
-void AHeroBuilderCharacter::OnLeaveInteractMode_Implementation(EPlayerCharacterInteractMode LeaveMode)
-{
-
-	switch (LeaveMode)
-	{
-	case IM_None:
-		break;
-	case IM_Normal:
-		break;
-	case IM_ConstructionMode:
-		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Server_CancelConstructionMode(this);
-		break;
-	default:
-		break;
-	}
-	CurrentlyInteractMode = IM_None;
-	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Leave InteractMode '%d'!"), *GetNameSafe(this), LeaveMode);
-}
 
 void AHeroBuilderCharacter::Server_Attack_Implementation()
 {
@@ -78,18 +42,25 @@ void AHeroBuilderCharacter::OnEnterState_Implementation(EPlayerCharacterState En
 		break;
 	case EPCS_Move:
 		break;
-	case EPCS_PreAttack:
+	case EPCS_PreInteract:
 	{
-		GetCharacterMovement()->StopMovementImmediately();
+		CurrentInteractDelay = PreInteractDelay;
 		break;
 	}
-	case EPCS_Attack:
+	case EPCS_Interact:
+	{
 		break;
-	case EPCS_PostAttack:
+	}
+	case EPCS_PostInteract:
+	{
+		CurrentInteractDelay = PostInteractDelay;
 		break;
+	}
 	default:
 		break;
 	}
+	CurrentlyState = EnterState;
+	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Enter State '%d'!"), *GetNameSafe(this), EnterState);
 }
 
 void AHeroBuilderCharacter::OnLeaveState_Implementation(EPlayerCharacterState LeaveState)
@@ -101,16 +72,27 @@ void AHeroBuilderCharacter::OnLeaveState_Implementation(EPlayerCharacterState Le
 	case EPCS_Idle:
 		break;
 	case EPCS_Move:
+	{
+		GetCharacterMovement()->StopMovementImmediately();
 		break;
-	case EPCS_PreAttack:
-		break;
-	case EPCS_Attack:
-		break;
-	case EPCS_PostAttack:
-		break;
+	}
+	case EPCS_PreInteract:
+    {
+        break;
+    }
+	case EPCS_Interact:
+    {
+        break;
+    }
+	case EPCS_PostInteract:
+    {
+        break;
+    }
 	default:
 		break;
 	}
+	CurrentlyState = EPCS_None;
+	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Leave State '%d'!"), *GetNameSafe(this), LeaveState);
 }
 
 AHeroBuilderCharacter::AHeroBuilderCharacter()
@@ -147,19 +129,9 @@ AHeroBuilderCharacter::AHeroBuilderCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
+	InteractComponent = CreateDefaultSubobject<UHB_InteractComponent>(TEXT("InteractComponent"));
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
-}
-
-void AHeroBuilderCharacter::SwitchInteractMode(EPlayerCharacterInteractMode NewMode)
-{
-	if (CurrentlyInteractMode == NewMode)
-	{
-		return;
-	}
-	OnLeaveInteractMode(CurrentlyInteractMode);
-	OnEnterInteractMode(NewMode);
-	CurrentlyInteractMode = NewMode;
 }
 
 void AHeroBuilderCharacter::SwitchState(EPlayerCharacterState NewState)
@@ -168,10 +140,19 @@ void AHeroBuilderCharacter::SwitchState(EPlayerCharacterState NewState)
 	{
 		return;
 	}
+
 	OnLeaveState(CurrentlyState);
 	OnEnterState(NewState);
+}
 
+void AHeroBuilderCharacter::SetPreInteractDelay(float Delay)
+{
+	PreInteractDelay = Delay;
+}
 
+void AHeroBuilderCharacter::SetPostInteractDelay(float Delay)
+{
+    PostInteractDelay = Delay;
 }
 
 void AHeroBuilderCharacter::BeginPlay()
@@ -183,31 +164,60 @@ void AHeroBuilderCharacter::BeginPlay()
 void AHeroBuilderCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	
-
-	switch (CurrentlyState)
+	if(HasAuthority())
 	{
-	case EPCS_None:
-		break;
-	case EPCS_Idle:
-		break;
-	case EPCS_Move:
-		break;
-	case EPCS_PreAttack:
-		break;
-	case EPCS_Attack:
-		break;
-	case EPCS_PostAttack:
-		break;
-	default:
-		break;
+		TickUpdateState(DeltaTime);
+		switch (CurrentlyState)
+		{
+		case EPCS_None:
+			break;
+		case EPCS_Idle:
+			break;
+		case EPCS_Move:
+			break;
+		case EPCS_PreInteract:
+		{
+			//前摇计时，结束后进入交互帧
+			if (CurrentInteractDelay > 0.f)
+			{
+				CurrentInteractDelay -= DeltaTime;
+			}
+			else
+			{
+				SwitchState(EPCS_Interact);
+			}
+			break;
+		}
+		case EPCS_Interact:
+		{
+			//交互帧已在OnEnterState中执行，这里直接进入后摇
+			SwitchState(EPCS_PostInteract);
+			//到达交互帧：服务端调用交互逻辑
+			Server_TryInteract();
+			break;
+		}
+		case EPCS_PostInteract:
+		{
+			//后摇计时，结束后回到Idle
+			if (CurrentInteractDelay > 0.f)
+			{
+				CurrentInteractDelay -= DeltaTime;
+			}
+			else
+			{
+				SwitchState(EPCS_Idle);
+			}
+			break;
+		}
+		default:
+			break;
+		}
 	}
 }
 
 void AHeroBuilderCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AHeroBuilderCharacter, CurrentlyInteractMode);
 	DOREPLIFETIME(AHeroBuilderCharacter, CurrentlyState);
 
 }
@@ -294,53 +304,39 @@ void AHeroBuilderCharacter::Look(const FInputActionValue& Value)
 
 void AHeroBuilderCharacter::ChangeConstructionMode(const FInputActionValue& Value)
 {
-	if (CurrentlyInteractMode == IM_ConstructionMode)
+	//本地端通过Server RPC请求服务器切换交互模式
+	UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>();
+	if (!InteractSys)
 	{
-		SwitchInteractMode(IM_Normal);
+		return;
 	}
-	else
-	{
-		SwitchInteractMode(IM_ConstructionMode);
-	}
-
+	const EPlayerCharacterInteractMode CurrentMode = InteractSys->GetInteractMode(this);
+	const EPlayerCharacterInteractMode NewMode = (CurrentMode == IM_ConstructionMode) ? IM_Normal : IM_ConstructionMode;
+	Server_SwitchInteractMode(static_cast<uint8>(NewMode));
 }
 
 void AHeroBuilderCharacter::Interact(const FInputActionValue& Value)
 {
-	switch (CurrentlyInteractMode)
+	//仅在Idle/Move状态下可以起手交互，避免重复触发
+	if (CurrentlyState != EPCS_Idle && CurrentlyState != EPCS_Move)
 	{
-	case IM_None:
-	{
-		
-		break;
+		return;
 	}
-	case IM_ConstructionMode:
+	SwitchState(EPCS_PreInteract);
+}
+
+void AHeroBuilderCharacter::Server_SwitchInteractMode_Implementation(uint8 NewMode)
+{
+	if (UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>())
 	{
-		Server_ConstructionBegin(this);
-		break;
-	}
-	default:
-		break;
+		InteractSys->SwitchInteractMode(this, static_cast<EPlayerCharacterInteractMode>(NewMode));
 	}
 }
 
-void AHeroBuilderCharacter::Server_ConstructionBegin_Implementation(ACharacter*InCharacter)
+void AHeroBuilderCharacter::Server_TryInteract_Implementation()
 {
-	if (IsValid(InCharacter))
+	if (UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>())
 	{
-		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->ConstructionBegin(InCharacter);
-	}
-
-}
-
-void AHeroBuilderCharacter::Server_ConstructionMode_Implementation(bool bEnable)
-{
-	if (bEnable)
-	{
-		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Server_ActiveConstructionMode(this);
-	}
-	else
-	{
-		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Server_CancelConstructionMode(this);
+		InteractSys->TryInteract(this);
 	}
 }

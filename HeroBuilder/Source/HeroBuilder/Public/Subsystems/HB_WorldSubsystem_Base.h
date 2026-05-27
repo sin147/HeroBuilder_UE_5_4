@@ -17,8 +17,12 @@ class UHB_WorldSubsystem_Base : public UTickableWorldSubsystem
 	GENERATED_BODY()
 protected:
 	ENetMode NetMode;
+	virtual void OnPlayerLogin(AGameModeBase* GameMode, APlayerController* PlayerController);
+	virtual void OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting);
 public:
-	virtual void PostInitialize() override;
+	// USubsystem implementation Begin
+	 virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	 virtual void Deinitialize() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
 	template <typename T>
