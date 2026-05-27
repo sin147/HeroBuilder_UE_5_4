@@ -17,6 +17,102 @@ DEFINE_LOG_CATEGORY(LogPlayerCharacter);
 //////////////////////////////////////////////////////////////////////////
 // AHeroBuilderCharacter
 
+void AHeroBuilderCharacter::OnEnterInteractMode_Implementation(EPlayerCharacterInteractMode EnterMode)
+{
+	switch (EnterMode)
+	{
+	case IM_None:
+		break;
+	case IM_Normal:
+		break;
+	case IM_ConstructionMode:
+		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Server_ActiveConstructionMode(this);
+		break;
+	default:
+		break;
+	}
+	CurrentlyInteractMode = EnterMode;
+	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Enter InteractMode '%d'!"), *GetNameSafe(this), EnterMode);
+}
+
+void AHeroBuilderCharacter::OnLeaveInteractMode_Implementation(EPlayerCharacterInteractMode LeaveMode)
+{
+
+	switch (LeaveMode)
+	{
+	case IM_None:
+		break;
+	case IM_Normal:
+		break;
+	case IM_ConstructionMode:
+		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Server_CancelConstructionMode(this);
+		break;
+	default:
+		break;
+	}
+	CurrentlyInteractMode = IM_None;
+	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Leave InteractMode '%d'!"), *GetNameSafe(this), LeaveMode);
+}
+
+void AHeroBuilderCharacter::Server_Attack_Implementation()
+{
+
+}
+
+void AHeroBuilderCharacter::TickUpdateState(float DeltaTime)
+{
+	if(!GetVelocity().IsNearlyZero())
+	{
+		SwitchState(EPCS_Move);
+	}
+
+}
+
+void AHeroBuilderCharacter::OnEnterState_Implementation(EPlayerCharacterState EnterState)
+{
+	switch (EnterState)
+	{
+	case EPCS_None:
+		break;
+	case EPCS_Idle:
+		break;
+	case EPCS_Move:
+		break;
+	case EPCS_PreAttack:
+	{
+		GetCharacterMovement()->StopMovementImmediately();
+		break;
+	}
+	case EPCS_Attack:
+		break;
+	case EPCS_PostAttack:
+		break;
+	default:
+		break;
+	}
+}
+
+void AHeroBuilderCharacter::OnLeaveState_Implementation(EPlayerCharacterState LeaveState)
+{
+	switch (LeaveState)
+	{
+	case EPCS_None:
+		break;
+	case EPCS_Idle:
+		break;
+	case EPCS_Move:
+		break;
+	case EPCS_PreAttack:
+		break;
+	case EPCS_Attack:
+		break;
+	case EPCS_PostAttack:
+		break;
+	default:
+		break;
+	}
+}
+
 AHeroBuilderCharacter::AHeroBuilderCharacter()
 {
 	// Set size for collision capsule
@@ -55,10 +151,65 @@ AHeroBuilderCharacter::AHeroBuilderCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
+void AHeroBuilderCharacter::SwitchInteractMode(EPlayerCharacterInteractMode NewMode)
+{
+	if (CurrentlyInteractMode == NewMode)
+	{
+		return;
+	}
+	OnLeaveInteractMode(CurrentlyInteractMode);
+	OnEnterInteractMode(NewMode);
+	CurrentlyInteractMode = NewMode;
+}
+
+void AHeroBuilderCharacter::SwitchState(EPlayerCharacterState NewState)
+{
+	if (CurrentlyState == NewState)
+	{
+		return;
+	}
+	OnLeaveState(CurrentlyState);
+	OnEnterState(NewState);
+
+
+}
+
 void AHeroBuilderCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
+}
+
+void AHeroBuilderCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	
+
+	switch (CurrentlyState)
+	{
+	case EPCS_None:
+		break;
+	case EPCS_Idle:
+		break;
+	case EPCS_Move:
+		break;
+	case EPCS_PreAttack:
+		break;
+	case EPCS_Attack:
+		break;
+	case EPCS_PostAttack:
+		break;
+	default:
+		break;
+	}
+}
+
+void AHeroBuilderCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AHeroBuilderCharacter, CurrentlyInteractMode);
+	DOREPLIFETIME(AHeroBuilderCharacter, CurrentlyState);
+
 }
 
 FVector AHeroBuilderCharacter::GetFollowCameraForward()
@@ -143,44 +294,33 @@ void AHeroBuilderCharacter::Look(const FInputActionValue& Value)
 
 void AHeroBuilderCharacter::ChangeConstructionMode(const FInputActionValue& Value)
 {
-	if (CurrentlyState == EPCS_ConstructionMode)
+	if (CurrentlyInteractMode == IM_ConstructionMode)
 	{
-		CurrentlyState = EPCS_None;
+		SwitchInteractMode(IM_Normal);
 	}
 	else
 	{
-		CurrentlyState = EPCS_ConstructionMode;
+		SwitchInteractMode(IM_ConstructionMode);
 	}
-	bool bEnable=CurrentlyState == EPCS_ConstructionMode;
-	Server_ConstructionMode(bEnable);
-    UE_LOG(LogPlayerCharacter, Log, TEXT("ConstructionMode %s"), bEnable ? TEXT("ON") : TEXT("OFF"));
+
 }
 
 void AHeroBuilderCharacter::Interact(const FInputActionValue& Value)
 {
-	switch (CurrentlyState)
+	switch (CurrentlyInteractMode)
 	{
-	case EPCS_None:
+	case IM_None:
+	{
+		
 		break;
-	case EPCS_ConstructionMode:
+	}
+	case IM_ConstructionMode:
 	{
 		Server_ConstructionBegin(this);
 		break;
 	}
 	default:
 		break;
-	}
-}
-
-void AHeroBuilderCharacter::Client_ConstructionMode(bool bEnable)
-{
-	if (bEnable)
-	{
-		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Client_ActiveConstructionMode(this);
-	}
-	else
-	{
-		GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->Client_CancelConstructionMode(this);
 	}
 }
 

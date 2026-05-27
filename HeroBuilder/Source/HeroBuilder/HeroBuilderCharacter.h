@@ -16,18 +16,31 @@ struct FInputActionValue;
 DECLARE_LOG_CATEGORY_EXTERN(LogPlayerCharacter, Log, All);
 
 UENUM(BlueprintType)
-enum EPlayerCharacterState:uint8
+enum EPlayerCharacterInteractMode:uint8
 {
-	EPCS_None ,
-    EPCS_ConstructionMode,
+	IM_None ,
+	IM_Normal,
+    IM_ConstructionMode,
+};
+UENUM(BlueprintType)
+enum EPlayerCharacterState :uint8
+{
+	EPCS_None,
+	EPCS_Idle,
+	EPCS_Move,
+	EPCS_PreAttack,
+	EPCS_Attack,
+    EPCS_PostAttack,
 };
 
 UCLASS(config=Game)
 class AHeroBuilderCharacter : public ACharacter
 {
 	GENERATED_BODY()
-
-	TEnumAsByte<EPlayerCharacterState> CurrentlyState= EPCS_None;
+	UPROPERTY(Replicated)
+	TEnumAsByte<EPlayerCharacterInteractMode> CurrentlyInteractMode= IM_Normal;
+	UPROPERTY(Replicated)
+	TEnumAsByte<EPlayerCharacterState> CurrentlyState = EPCS_Idle;
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -58,10 +71,21 @@ class AHeroBuilderCharacter : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* InteractAction;
-
+	UFUNCTION(Server, Reliable)
+	void OnEnterInteractMode(EPlayerCharacterInteractMode EnterMode);
+	UFUNCTION(Server, Reliable)
+	void OnLeaveInteractMode(EPlayerCharacterInteractMode LeaveMode);
+	UFUNCTION(Server,Reliable)
+	void Server_Attack();
+	void TickUpdateState(float DeltaTime);
+	UFUNCTION(Server, Reliable)
+	void OnEnterState(EPlayerCharacterState EnterState);
+	UFUNCTION(Server, Reliable)
+	void OnLeaveState(EPlayerCharacterState LeaveState);
 public:
 	AHeroBuilderCharacter();
-	
+	void SwitchInteractMode(EPlayerCharacterInteractMode NewMode);
+	void SwitchState(EPlayerCharacterState NewState);
 
 protected:
 
@@ -77,7 +101,6 @@ protected:
 
 	UFUNCTION(Server,Reliable)
 	void Server_ConstructionMode(bool bEnable);
-	void Client_ConstructionMode(bool bEnable);
 	UFUNCTION(Server, Reliable)
 	void Server_ConstructionBegin(ACharacter* InCharacter);
 
@@ -87,7 +110,9 @@ protected:
 	
 	// To add mapping context
 	virtual void BeginPlay();
+	virtual void Tick(float DeltaTime) override;
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
