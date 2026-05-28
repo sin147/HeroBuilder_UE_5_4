@@ -36,6 +36,13 @@ private:
 	//随机生成位置
 	FTransform GetRandomSpawnTransform() const;
 
+	//缓存的玩家控制器列表（在OnPlayerLogin时记录，用于获取玩家位置等）
+	TArray<TWeakObjectPtr<APlayerController>> CachedPlayerControllers;
+
+protected:
+	virtual void OnPlayerLogin(AGameModeBase* GameMode, APlayerController* PlayerController) override;
+	virtual void OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting) override;
+
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 

@@ -169,17 +169,19 @@ void UHB_BuildingSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass
 
 void UHB_BuildingSubsystem::DestroyBuilding(AHB_Building_Base*InBuilding)
 {
-	if (IsValid(InBuilding))
-	{
-		UE_LOG(LogBuildingSystem, Log, TEXT("Adding building to destroy queue - Building: %s, Location: %s"), 
-			*InBuilding->GetName(), *InBuilding->GetActorLocation().ToString());
-	}
-	else
+	if (!IsValid(InBuilding))
 	{
 		UE_LOG(LogBuildingSystem, Warning, TEXT("Attempted to destroy invalid building"));
+		return;
 	}
+	UE_LOG(LogBuildingSystem, Log, TEXT("Destroying building - Building: %s, Location: %s"),
+		*InBuilding->GetName(), *InBuilding->GetActorLocation().ToString());
 	OnDestroyBuilding.Broadcast(InBuilding, InBuilding->GetActorTransform());
-	GetManager<AHB_BuildingManager>()->RemoveBuilding(InBuilding);
+	AHB_BuildingManager* BuildingManager = GetManager<AHB_BuildingManager>();
+	if (BuildingManager)
+	{
+		BuildingManager->RemoveBuilding(InBuilding);
+	}
 	InBuilding->Destroy();
 }
 

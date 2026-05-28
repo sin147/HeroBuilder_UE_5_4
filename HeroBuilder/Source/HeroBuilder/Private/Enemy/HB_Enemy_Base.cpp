@@ -45,10 +45,17 @@ AHB_Enemy_Base::AHB_Enemy_Base()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-	
+
 	// 设置 AI 控制器类
 	AIControllerClass = AAIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+
+	// 创建血量 Widget 组件
+	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
+	HealthBarWidget->SetupAttachment(RootComponent);
+	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
+	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	HealthBarWidget->SetDrawSize(FVector2D(150.f, 20.f));
 }
 
 bool AHB_Enemy_Base::IsDeath()
@@ -81,7 +88,10 @@ void AHB_Enemy_Base::ApplyDamage(AActor* Attacker, float Damage)
 	if (CurrentHealth <= 0)
 	{
 		SwitchState(EEnemyState::ES_Death);
-		AIController->StopMovement();
+		if (IsValid(AIController))
+		{
+			AIController->StopMovement();
+		}
 		OnDeath();
 	}
 }
@@ -133,6 +143,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		if (!IsValidTarget(Target))
 		{
 			SwitchState(EEnemyState::ES_Idle);
+			break;
 		}
 		if (FVector::Distance(GetActorLocation(), Target->GetActorLocation()) > CombatRange)
 		{
@@ -152,6 +163,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		if (!IsValidTarget(Target))
 		{
 			SwitchState(EEnemyState::ES_Idle);
+			break;
 		}
 		if (Status == EPathFollowingStatus::Moving)
 		{
@@ -173,6 +185,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		if (!IsValidTarget(Target))
 		{
 			SwitchState(EEnemyState::ES_Idle);
+			break;
 		}
 		if (Status == EPathFollowingStatus::Moving)
 		{
@@ -200,6 +213,7 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		if (!IsValidTarget(Target))
 		{
 			SwitchState(EEnemyState::ES_Idle);
+			break;
 		}
 		if (Status == EPathFollowingStatus::Moving)
 		{
@@ -336,8 +350,11 @@ void AHB_Enemy_Base::StopAttack()
 
 void AHB_Enemy_Base::SetTarget(TObjectPtr<AActor>InTarget)
 {
-	AIController->MoveToActor(InTarget);
 	Target = InTarget;
+	if (IsValid(AIController) && IsValid(InTarget))
+	{
+		AIController->MoveToActor(InTarget);
+	}
 }
 
 void AHB_Enemy_Base::InitialEnemy(const FEnemyConfig& InConfig)

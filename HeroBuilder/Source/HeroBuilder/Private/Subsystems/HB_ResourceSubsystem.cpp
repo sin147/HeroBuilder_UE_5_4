@@ -6,6 +6,7 @@
 #include "Helper/HB_ResourceHelper.h"
 #include "Subsystems/HB_GridSubsystem.h"
 #include "Config/ResourceData.h"
+#include "GameFramework/PlayerController.h"
 
 DEFINE_LOG_CATEGORY(LogResourceSubsystem);
 
@@ -25,6 +26,26 @@ void UHB_ResourceSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		//初始化每个生成配置的计时器
 		SpawnConfigTimers.Init(0.f, ResourceData->GetResourceSpawnConfigs().Num());
 	}
+}
+
+void UHB_ResourceSubsystem::OnPlayerLogin(AGameModeBase* GameMode, APlayerController* PlayerController)
+{
+	Super::OnPlayerLogin(GameMode, PlayerController);
+	//缓存玩家控制器，用于后续获取玩家位置
+	if (PlayerController)
+	{
+		CachedPlayerControllers.AddUnique(PlayerController);
+	}
+}
+
+void UHB_ResourceSubsystem::OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting)
+{
+	Super::OnPlayerLogout(GameMode, Exiting);
+	//从缓存中移除已退出的玩家，同时顺带清理已失效的弱引用
+	CachedPlayerControllers.RemoveAll([Exiting](const TWeakObjectPtr<APlayerController>& Weak)
+	{
+		return !Weak.IsValid() || Weak.Get() == Exiting;
+	});
 }
 
 void UHB_ResourceSubsystem::Tick(float DeltaTime)
@@ -113,27 +134,62 @@ int32 UHB_ResourceSubsystem::GetAliveResourceCountByClass(TSubclassOf<AHB_Resour
 
 FTransform UHB_ResourceSubsystem::GetRandomSpawnTransform() const
 {
-	FVector Center = FVector::ZeroVector;
-	FVector Extent = FVector(2000.f, 2000.f, 0.f);
-	if (IsValid(ResourceData))
+	UHB_GridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UHB_GridSubsystem>();
+	const float GridWidth = (GridSubsystem ? static_cast<float>(GridSubsystem->GetGridWidth()) : 100.f);
+
+	FVector SpawnLocation = FVector::ZeroVector;
+
+	//优先：从FreeGrid中随机选一个可用格子作为生成点
+	TArray<FGridInfo> FreeGrids;
+	if (GridSubsystem)
 	{
-		Center = ResourceData->GetSpawnAreaCenter();
-		Extent = ResourceData->GetSpawnAreaExtent();
+		FreeGrids = GridSubsystem->GetFreeGridIndexs();
 	}
 
-	const float RandX = FMath::FRandRange(-Extent.X, Extent.X);
-	const float RandY = FMath::FRandRange(-Extent.Y, Extent.Y);
-	FVector SpawnLocation = Center + FVector(RandX, RandY, 0);
-	FVector2D GridIndex= GetWorld()->GetSubsystem<UHB_GridSubsystem>()->CalulateGridIndexByLocation(SpawnLocation);
-	TArray<FGridInfo> UsedGrids=GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetUsedGridIndexs();
-	TArray<FGridInfo> FreeGrids = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetUsedGridIndexs();
-	if(UsedGrids.Contains(FGridInfo(GridIndex.X,GridIndex.Y)))
+	if (!FreeGrids.IsEmpty())
 	{
-		if (!FreeGrids.IsEmpty())
+		const int32 PickIndex = FMath::RandRange(0, FreeGrids.Num() - 1);
+		const FGridInfo& Grid = FreeGrids[PickIndex];
+		//格子索引转世界坐标，取格子中心
+		SpawnLocation = FVector(
+			Grid.X * GridWidth + GridWidth * 0.5f,
+			Grid.Y * GridWidth + GridWidth * 0.5f,
+			0.f);
+	}
+	else
+	{
+		//回退：以当前玩家为中心，在指定半径内随机生成
+		float Radius = 1500.f;
+		if (IsValid(ResourceData))
 		{
-			SpawnLocation=FVector(FreeGrids[0].X, FreeGrids[0].Y,0);
+			Radius = ResourceData->GetSpawnRadiusAroundPlayer();
 		}
-		return GetRandomSpawnTransform();
+
+		FVector PlayerCenter = FVector::ZeroVector;
+		//从所有已登录玩家中收集出有效的Pawn
+		TArray<APawn*> ValidPawns;
+		ValidPawns.Reserve(CachedPlayerControllers.Num());
+		for (const TWeakObjectPtr<APlayerController>& Weak : CachedPlayerControllers)
+		{
+			if (APlayerController* PC = Weak.Get())
+			{
+				if (APawn* Pawn = PC->GetPawn())
+				{
+					ValidPawns.Add(Pawn);
+				}
+			}
+		}
+		//随机选一个玩家作为生成中心
+		if (ValidPawns.Num() > 0)
+		{
+			const int32 PickIndex = FMath::RandRange(0, ValidPawns.Num() - 1);
+			PlayerCenter = ValidPawns[PickIndex]->GetActorLocation();
+		}
+
+		const float Angle = FMath::FRandRange(0.f, 2.f * PI);
+		const float Dist = FMath::FRandRange(0.f, Radius);
+		SpawnLocation = PlayerCenter + FVector(FMath::Cos(Angle) * Dist, FMath::Sin(Angle) * Dist, 0.f);
+		SpawnLocation.Z = 0.f;
 	}
 
 	const FRotator SpawnRotation = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);

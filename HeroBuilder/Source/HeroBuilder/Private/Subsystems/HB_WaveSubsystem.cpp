@@ -87,7 +87,8 @@ void UHB_WaveSubsystem::WaveTick(float DeltaTime)
 		}
 
 		//还需要等待所有敌人被击杀TODO
-		if (IsSpawnOver&& GetWorld()->GetSubsystem<UHB_EnemySubsystem>()->GetEnemyNum() == 0)
+		UHB_EnemySubsystem* EnemySubsystem = GetWorld()->GetSubsystem<UHB_EnemySubsystem>();
+		if (IsSpawnOver && EnemySubsystem && EnemySubsystem->GetEnemyNum() == 0)
 		{
 			WaveState = WS_End;
 			UE_LOG(LogWaveSubsystem, Log, TEXT("Enter EndState"));
@@ -139,15 +140,20 @@ void UHB_WaveSubsystem::ActiveWaveByIndex(int32 InWaveIndex,bool AutoNextWave)
 		WaveState = WS_Stop;
 		return;
 	}
-	if (InWaveIndex >= WaveData->WaveConfigs.Num())
+	if (!WaveData->WaveConfigs.Contains(InWaveIndex))
 	{
-		UE_LOG(LogWaveSubsystem, Error, TEXT("InWaveIndex is out of range"));
+		UE_LOG(LogWaveSubsystem, Error, TEXT("WaveIndex %d not found in WaveConfigs"), InWaveIndex);
+		WaveState = WS_Stop;
 		return;
 	}
 
-
 	CurrentlyWaveIndex = InWaveIndex;
-	CurrentlyWaveConfig = WaveData->GetWaveConfigByWaveIndex(InWaveIndex);
+	if (!WaveData->GetWaveConfigByWaveIndex(InWaveIndex, CurrentlyWaveConfig))
+	{
+		UE_LOG(LogWaveSubsystem, Error, TEXT("Failed to get WaveConfig for WaveIndex %d"), InWaveIndex);
+		WaveState = WS_Stop;
+		return;
+	}
 	RemainingPreparatoryTime = CurrentlyWaveConfig.WaveInterval;
 	CurrentlyWaveEnemyConfigs = CurrentlyWaveConfig.EnemyConfigs;
 	CurrentlyFightTime = 0;

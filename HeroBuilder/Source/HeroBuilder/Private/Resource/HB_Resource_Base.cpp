@@ -5,6 +5,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Subsystems/HB_ResourceSubsystem.h"
 #include "Config/ResourceData.h"
+#include "Components/BoxComponent.h"
+#include "Components/WidgetComponent.h"
 
 DEFINE_LOG_CATEGORY(LogResource)
 
@@ -15,6 +17,19 @@ AHB_Resource_Base::AHB_Resource_Base()
 	PrimaryActorTick.bCanEverTick = true;
 
 	bReplicates = true;
+
+	// 创建用于检测的Box碰撞盒，并设置Profile为Resource
+	CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox"));
+	CollisionBox->SetCollisionProfileName(TEXT("Resource"));
+	CollisionBox->SetBoxExtent(FVector(50.f, 50.f, 50.f));
+	RootComponent = CollisionBox;
+
+	// 创建血量 Widget 组件
+	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
+	HealthBarWidget->SetupAttachment(RootComponent);
+	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 80.f));
+	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	HealthBarWidget->SetDrawSize(FVector2D(120.f, 15.f));
 }
 
 FString AHB_Resource_Base::GetStateName(EResourceState State)
@@ -183,5 +198,6 @@ void AHB_Resource_Base::InitialResource(const FResourceConfig& InConfig)
 	DeathTime = InConfig.DeathTime;
 	ResourceType = InConfig.ResourceType;
 	ResourceAmount = InConfig.ResourceAmount;
+	InteractMode = InConfig.InteractMode;
 }
 

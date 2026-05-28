@@ -7,6 +7,7 @@
 #include "Interface/HB_DamageInterface.h"
 #include "AIController.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Components/WidgetComponent.h"
 #include "HB_Enemy_Base.generated.h"
 
 struct FEnemyConfig;
@@ -25,7 +26,7 @@ enum EEnemyState : uint8
 };
 
 
-UCLASS()
+UCLASS(Abstract)
 class HEROBUILDER_API AHB_Enemy_Base : public ACharacter,public IHB_DamageInterface
 {
 	GENERATED_BODY()
@@ -57,9 +58,15 @@ public:
 	// Sets default values for this character's properties
 	AHB_Enemy_Base();
 	bool IsDeath();
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	/** 血量显示 Widget 组件，可在蓝图中指定 WidgetClass */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UWidgetComponent> HealthBarWidget;
+
 	//攻击延迟
 	UPROPERTY(EditAnywhere, Category = "Attribute|Attack")
 	float AttackPreDelay = 1.0f;

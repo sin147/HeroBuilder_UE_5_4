@@ -55,7 +55,12 @@ void UHB_EnemySubsystem::TickFindTarget()
 {
     if (NetMode != ENetMode::NM_Client && !FindTargetEnemyQueue.IsEmpty())
 	{
-		TArray<TObjectPtr<AHB_Building_Base>> BuildingArray = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetAllValidBuilding();
+		UHB_BuildingSubsystem* BuildingSubsystem = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>();
+		if (!BuildingSubsystem)
+		{
+			return;
+		}
+		TArray<TObjectPtr<AHB_Building_Base>> BuildingArray = BuildingSubsystem->GetAllValidBuilding();
 		float CurrentlyFindNum = 0;
 		//遍历队列,找到最近的建筑
         while(!FindTargetEnemyQueue.IsEmpty() && CurrentlyFindNum < FindNumByTick)
@@ -63,11 +68,17 @@ void UHB_EnemySubsystem::TickFindTarget()
 			//取出一个敌人
 			TObjectPtr<AHB_Enemy_Base> OutItem;
             FindTargetEnemyQueue.Dequeue(OutItem);
+			if (!IsValid(OutItem) || OutItem->IsDeath())
+			{
+				CurrentlyFindNum++;
+				continue;
+			}
 			//找到最近的建筑
             TPair<TObjectPtr<AHB_Building_Base>, float>TargetDistancePair(nullptr, 1000000000);
 			float Distance = 0;
 			for (TObjectPtr<AHB_Building_Base> Building : BuildingArray)
 			{
+				if (!IsValid(Building)) continue;
 				Distance = FVector::DistSquared(OutItem->GetActorLocation(), Building->GetActorLocation());
 				if (TargetDistancePair.Value > Distance)
 				{
@@ -157,7 +168,15 @@ void UHB_EnemySubsystem::SpawnEnemy(TSubclassOf<AHB_Enemy_Base> InClass, const F
 
 void UHB_EnemySubsystem::DestroyEnemy(AHB_Enemy_Base* InEnemy)
 {
-	GetManager<AHB_EnemyManager>()->RemoveEnemy(InEnemy);
+	if (!IsValid(InEnemy))
+	{
+		return;
+	}
+	AHB_EnemyManager* EnemyManager = GetManager<AHB_EnemyManager>();
+	if (EnemyManager)
+	{
+		EnemyManager->RemoveEnemy(InEnemy);
+	}
 	InEnemy->Destroy();
 }
 

@@ -25,9 +25,22 @@ void AHeroBuilderCharacter::Server_Attack_Implementation()
 
 void AHeroBuilderCharacter::TickUpdateState(float DeltaTime)
 {
+	// 交互相关状态不应被移动打断
+	if (CurrentlyState == EPCS_PreInteract || CurrentlyState == EPCS_Interact || CurrentlyState == EPCS_PostInteract)
+	{
+		return;
+	}
+
 	if(!GetVelocity().IsNearlyZero())
 	{
 		SwitchState(EPCS_Move);
+	}
+	else
+	{
+		if (CurrentlyState == EPCS_Move)
+		{
+			SwitchState(EPCS_Idle);
+		}
 	}
 
 }
@@ -60,7 +73,8 @@ void AHeroBuilderCharacter::OnEnterState_Implementation(EPlayerCharacterState En
 		break;
 	}
 	CurrentlyState = EnterState;
-	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Enter State '%d'!"), *GetNameSafe(this), EnterState);
+	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)EnterState);
+	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Enter State '%s'!"), *GetNameSafe(this), *StateName);
 }
 
 void AHeroBuilderCharacter::OnLeaveState_Implementation(EPlayerCharacterState LeaveState)
@@ -92,7 +106,8 @@ void AHeroBuilderCharacter::OnLeaveState_Implementation(EPlayerCharacterState Le
 		break;
 	}
 	CurrentlyState = EPCS_None;
-	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Leave State '%d'!"), *GetNameSafe(this), LeaveState);
+	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)LeaveState);
+	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Leave State '%s'!"), *GetNameSafe(this), *StateName);
 }
 
 AHeroBuilderCharacter::AHeroBuilderCharacter()
@@ -129,7 +144,6 @@ AHeroBuilderCharacter::AHeroBuilderCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
-	InteractComponent = CreateDefaultSubobject<UHB_InteractComponent>(TEXT("InteractComponent"));
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -153,6 +167,16 @@ void AHeroBuilderCharacter::SetPreInteractDelay(float Delay)
 void AHeroBuilderCharacter::SetPostInteractDelay(float Delay)
 {
     PostInteractDelay = Delay;
+}
+
+float AHeroBuilderCharacter::GetAttack() const
+{
+	return Attack;
+}
+
+void AHeroBuilderCharacter::SetAttack(float NewAttack)
+{
+	Attack = NewAttack;
 }
 
 void AHeroBuilderCharacter::BeginPlay()
@@ -219,7 +243,14 @@ void AHeroBuilderCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHeroBuilderCharacter, CurrentlyState);
+	DOREPLIFETIME(AHeroBuilderCharacter, InteractTarget);
+	DOREPLIFETIME(AHeroBuilderCharacter, CurrentInteractMode);
+	DOREPLIFETIME(AHeroBuilderCharacter, Attack);
 
+}
+
+void AHeroBuilderCharacter::OnRep_CurrentInteractMode()
+{
 }
 
 FVector AHeroBuilderCharacter::GetFollowCameraForward()

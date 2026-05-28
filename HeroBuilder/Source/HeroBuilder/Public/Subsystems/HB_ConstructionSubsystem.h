@@ -45,7 +45,7 @@ class APreviewBuildingActor : public AStaticMeshActor
 {
 	GENERATED_BODY()
 private:
-	UPROPERTY(Replicated, ReplicatedUsing = OnRep_Mesh)
+	UPROPERTY(ReplicatedUsing = OnRep_Mesh)
 	UStaticMesh* ReplicatedMesh;
 	UFUNCTION()
 	void OnRep_Mesh();

@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
-#include "Component/HB_InteractComponent.h"
+#include "Config/InteractData.h"
 #include "HeroBuilderCharacter.generated.h"
 
 class USpringArmComponent;
@@ -20,12 +20,12 @@ DECLARE_LOG_CATEGORY_EXTERN(LogPlayerCharacter, Log, All);
 UENUM(BlueprintType)
 enum EPlayerCharacterState :uint8
 {
-	EPCS_None,
-	EPCS_Idle,
-	EPCS_Move,
-	EPCS_PreInteract,
-	EPCS_Interact,
-    EPCS_PostInteract,
+	EPCS_None UMETA(DisplayName = "无"),
+	EPCS_Idle UMETA(DisplayName = "空闲"),
+	EPCS_Move UMETA(DisplayName = "移动"),
+	EPCS_PreInteract UMETA(DisplayName = "交互前摇"),
+	EPCS_Interact UMETA(DisplayName = "交互"),
+    EPCS_PostInteract UMETA(DisplayName = "交互后摇"),
 };
 
 UCLASS(config=Game)
@@ -35,8 +35,16 @@ class AHeroBuilderCharacter : public ACharacter
 	UPROPERTY(Replicated)
 	TEnumAsByte<EPlayerCharacterState> CurrentlyState = EPCS_Idle;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UHB_InteractComponent> InteractComponent;
+	//当前交互目标（服务端权威，复制到客户端）
+	UPROPERTY(Replicated)
+	TObjectPtr<AActor> InteractTarget;
+
+	//当前玩家交互模式（服务端权威，复制到客户端）
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentInteractMode)
+	TEnumAsByte<EPlayerCharacterInteractMode> CurrentInteractMode = IM_Normal;
+
+	UFUNCTION()
+	void OnRep_CurrentInteractMode();
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -77,6 +85,10 @@ class AHeroBuilderCharacter : public ACharacter
 	//内部用于前/后摇倒计时
 	float CurrentInteractDelay = 0.f;
 
+	//角色攻击力（一次交互/攻击对目标造成的伤害量），服务端权威并复制到客户端
+	UPROPERTY(Replicated, EditAnywhere, BlueprintReadWrite, Category = "Stats", meta = (AllowPrivateAccess = "true"))
+	float Attack = 10.f;
+
 	UFUNCTION(Server,Reliable)
 	void Server_Attack();
 	void TickUpdateState(float DeltaTime);
@@ -91,6 +103,19 @@ public:
     void SetPostInteractDelay(float Delay);
 	UFUNCTION(BlueprintPure)
 	TEnumAsByte<EPlayerCharacterState> GetCurrentState() const { return CurrentlyState; }
+
+	//交互目标访问
+	void SetInteractTarget(AActor* Target) { InteractTarget = Target; }
+	AActor* GetInteractTarget() const { return InteractTarget; }
+
+	//交互模式访问
+	void SetInteractMode(EPlayerCharacterInteractMode NewMode) { CurrentInteractMode = NewMode; }
+	EPlayerCharacterInteractMode GetInteractMode() const { return CurrentInteractMode; }
+
+	//攻击力访问
+	UFUNCTION(BlueprintPure, Category = "Stats")
+	float GetAttack() const;
+	void SetAttack(float NewAttack);
 
 protected:
 
@@ -116,7 +141,7 @@ protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	
 	// To add mapping context
-	virtual void BeginPlay();
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

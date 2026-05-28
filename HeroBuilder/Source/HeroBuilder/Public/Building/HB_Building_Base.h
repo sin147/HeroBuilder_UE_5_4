@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
 #include "Interface/HB_DamageInterface.h"
+#include "Components/WidgetComponent.h"
 #include "HB_Building_Base.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogBuilding, Log, All);
@@ -23,7 +24,7 @@ enum EBuildingState : uint8
 	BS_Death UMETA(DisplayName = "Death"),
 };
 
-UCLASS()
+UCLASS(Abstract)
 class HEROBUILDER_API AHB_Building_Base : public AActor,public IHB_DamageInterface
 {
 	GENERATED_BODY()
@@ -44,7 +45,7 @@ private:
 	float MaxHealth = 100.f;
 	float CombatRange=1000;
 	bool WasFindTarget = false;
-	UPROPERTY(Replicated, ReplicatedUsing = OnRep_Rotation)
+	UPROPERTY(ReplicatedUsing = OnRep_Rotation)
 	FRotator RotateMeshRotation;
 	UFUNCTION()
 	void OnRep_Rotation();
@@ -62,6 +63,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	TObjectPtr<USceneComponent> Root;
+
+	/** 血量显示 Widget 组件，可在蓝图中指定 WidgetClass */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UWidgetComponent> HealthBarWidget;
 
 	//当客户端应用伤害
 	void OnClientApplyDamage(AActor* Attacker, float Damage);

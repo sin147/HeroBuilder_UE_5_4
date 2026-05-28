@@ -5,11 +5,15 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Config/ResourceData.h"
+#include "Config/InteractData.h"
 #include "Interface/HB_DamageInterface.h"
+#include "Components/WidgetComponent.h"
 #include "HB_Resource_Base.generated.h"
 
 struct FResourceConfig;
 DECLARE_LOG_CATEGORY_EXTERN(LogResource, Log, All);
+
+class UBoxComponent;
 
 UENUM(BlueprintType)
 enum EResourceState : uint8
@@ -20,7 +24,7 @@ enum EResourceState : uint8
 	RS_Death UMETA(DisplayName = "Death"),
 };
 
-UCLASS()
+UCLASS(Abstract)
 class HEROBUILDER_API AHB_Resource_Base : public AActor, public IHB_DamageInterface
 {
 	GENERATED_BODY()
@@ -57,6 +61,10 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
 	int32 ResourceAmount = 10;
 
+	//玩家靠近此资源时应自动切换到的交互模式（例如树木→IM_LumberMode、矿石→IM_MineMode）
+	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
+	TEnumAsByte<EPlayerCharacterInteractMode> InteractMode = IM_Normal;
+
 protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
 	TEnumAsByte<EResourceState> CurrentState;
@@ -65,10 +73,22 @@ protected:
 
 	ENetMode NetMode;
 
+	//用于检测的碰撞盒（Profile = Resource）
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = true))
+	TObjectPtr<UBoxComponent> CollisionBox;
+
+	/** 血量显示 Widget 组件，可在蓝图中指定 WidgetClass */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UWidgetComponent> HealthBarWidget;
+
 public:
 	// Sets default values for this actor's properties
 	AHB_Resource_Base();
 	bool IsDeath();
+
+	//获取碰撞盒
+	UFUNCTION(BlueprintCallable)
+	UBoxComponent* GetCollisionBox() const { return CollisionBox; }
 
 	//获取资源类型
 	UFUNCTION(BlueprintCallable)
@@ -77,6 +97,10 @@ public:
 	//获取资源数量
 	UFUNCTION(BlueprintCallable)
 	int32 GetResourceAmount() const { return ResourceAmount; }
+
+	//获取该资源关联的交互模式
+	UFUNCTION(BlueprintCallable)
+	EPlayerCharacterInteractMode GetInteractMode() const { return InteractMode; }
 
 protected:
 	// Called when the game starts or when spawned

@@ -40,9 +40,19 @@ class HEROBUILDER_API UEnemyData : public UDataAsset
 	GENERATED_BODY()
 
 private:
-	UPROPERTY(EditAnywhere, Category = "Enemy")
+	UPROPERTY(EditAnywhere, EditFixedSize, Category = "Enemy", meta = (ReadOnlyKeys))
 	TMap<TSubclassOf<AHB_Enemy_Base>, FEnemyConfig> EnemyInfoMap;
 	
 public:
 	FEnemyConfig GetEnemyInfoByEnemyClass(TSubclassOf<AHB_Enemy_Base> EnemyClass);
+
+#if WITH_EDITOR
+protected:
+	virtual void PostInitProperties() override;
+	virtual void PostLoad() override;
+
+private:
+	//扫描所有AHB_Enemy_Base子类并同步到EnemyInfoMap
+	void RefreshEnemyInfoMap();
+#endif
 };

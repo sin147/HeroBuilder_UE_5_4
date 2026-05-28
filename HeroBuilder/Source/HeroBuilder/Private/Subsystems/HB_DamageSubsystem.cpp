@@ -9,6 +9,11 @@
 DEFINE_LOG_CATEGORY(LogDamageSubsystem)
 void UHB_DamageSubsystem::TakeDamage(AActor* Attacker, float Damage, AActor* Target)
 {
+	if (!IsValid(Target))
+	{
+		UE_LOG(LogDamageSubsystem, Error, TEXT("TakeDamage called with invalid Target"));
+		return;
+	}
 	if(Cast<IHB_DamageInterface>(Target))
 	{
 		DamageQueue.Enqueue(FDamageInfo(Attacker, Damage, Target));
@@ -147,16 +152,24 @@ void UHB_DamageSubsystem::TakeSphereRangeDamage(AActor* Attacker, float Damage, 
 
 void UHB_DamageSubsystem::Tick(float DeltaTime)
 {
-	if(!DamageQueue.IsEmpty())
+	int32 ProcessedCount = 0;
+	const int32 MaxProcessPerTick = 50; // 每帧最多处理50条伤害，避免卡帧
+	while(!DamageQueue.IsEmpty() && ProcessedCount < MaxProcessPerTick)
 	{
 		FDamageInfo DamageInfo;
 		if (DamageQueue.Dequeue(DamageInfo))
 		{
+			if (!IsValid(DamageInfo.Target))
+			{
+				ProcessedCount++;
+				continue;
+			}
 			IHB_DamageInterface* DamageInterface = Cast<IHB_DamageInterface>(DamageInfo.Target);
             if (DamageInterface)
             {
                 DamageInterface->ApplyDamage(DamageInfo.Attacker, DamageInfo.Damage);
             }
 		}
+		ProcessedCount++;
 	}
 }

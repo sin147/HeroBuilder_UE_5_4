@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Config/InteractData.h"
 #include "ResourceData.generated.h"
 
 class AHB_Resource_Base;
@@ -45,6 +46,8 @@ public:
 	float DeathTime = 5.f;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Resource", SimpleDisplay = "死亡掉落资源数量")
 	int32 ResourceAmount = 10;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Resource", SimpleDisplay = "交互模式")
+	TEnumAsByte<EPlayerCharacterInteractMode> InteractMode = IM_Normal;
 };
 
 /**
@@ -75,7 +78,7 @@ class HEROBUILDER_API UResourceData : public UDataAsset
 	GENERATED_BODY()
 
 private:
-	UPROPERTY(EditAnywhere, Category = "Resource")
+	UPROPERTY(EditAnywhere, EditFixedSize, Category = "Resource", meta = (ReadOnlyKeys))
 	TMap<TSubclassOf<AHB_Resource_Base>, FResourceConfig> ResourceInfoMap;
 
 	//资源生成配置列表
@@ -90,9 +93,24 @@ private:
 	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "随机生成区域范围"))
 	FVector SpawnAreaExtent = FVector(2000.f, 2000.f, 0.f);
 
+	//无FreeGrid可用时，以玩家为中心的随机生成半径
+	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "玩家中心生成半径", ClampMin = "0.0"))
+	float SpawnRadiusAroundPlayer = 1500.f;
+
 public:
 	FResourceConfig GetResourceInfoByResourceClass(TSubclassOf<AHB_Resource_Base> ResourceClass);
 	const TArray<FResourceSpawnConfig>& GetResourceSpawnConfigs() const { return ResourceSpawnConfigs; }
 	FVector GetSpawnAreaCenter() const { return SpawnAreaCenter; }
 	FVector GetSpawnAreaExtent() const { return SpawnAreaExtent; }
+	float GetSpawnRadiusAroundPlayer() const { return SpawnRadiusAroundPlayer; }
+
+#if WITH_EDITOR
+protected:
+	virtual void PostInitProperties() override;
+	virtual void PostLoad() override;
+
+private:
+	//扫描所有AHB_Resource_Base子类并同步到ResourceInfoMap
+	void RefreshResourceInfoMap();
+#endif
 };

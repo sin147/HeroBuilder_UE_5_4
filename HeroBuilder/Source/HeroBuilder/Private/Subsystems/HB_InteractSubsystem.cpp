@@ -3,11 +3,13 @@
 
 #include "Subsystems/HB_InteractSubsystem.h"
 #include "Subsystems/HB_ConstructionSubsystem.h"
+#include "Subsystems/HB_DamageSubsystem.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
 #include "HeroBuilder/HeroBuilderCharacter.h"
+#include "Resource/HB_Resource_Base.h"
+#include "Enemy/HB_Enemy_Base.h"
 #include "Engine/OverlapResult.h"
-#include "Component/HB_InteractComponent.h"
 
 DEFINE_LOG_CATEGORY(LogInteractSubsystem);
 
@@ -24,8 +26,8 @@ void UHB_InteractSubsystem::TickUpdateInteractTarget(float DeltaTime)
 		{
 			continue;
 		}
-		UHB_InteractComponent* InteractComp = Character->FindComponentByClass<UHB_InteractComponent>();
-		if (!InteractComp)
+		AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(Character);
+		if (!HBCharacter)
 		{
 			continue;
 		}
@@ -66,7 +68,42 @@ void UHB_InteractSubsystem::TickUpdateInteractTarget(float DeltaTime)
 		}
 
 		// 更新最近交互目标
-		InteractComp->SetInteractTarget(NewNearest);
+		HBCharacter->SetInteractTarget(NewNearest);
+
+		// 根据目标类型同步交互模式：仅在“被动模式”下自动切换，
+		// 保留玩家主动选择的模式（如 IM_ConstructionMode）不被覆盖。
+		const EPlayerCharacterInteractMode CurrentMode = HBCharacter->GetInteractMode();
+		const bool bIsPassiveMode =
+			(CurrentMode == IM_None) ||
+			(CurrentMode == IM_Normal) ||
+			(CurrentMode == IM_LumberMode) ||
+			(CurrentMode == IM_GatherMode) ||
+			(CurrentMode == IM_MineMode) ||
+			(CurrentMode == IM_AttackMode);
+
+		if (bIsPassiveMode)
+		{
+			EPlayerCharacterInteractMode DesiredMode = IM_Normal;
+			if (AHB_Resource_Base* Resource = Cast<AHB_Resource_Base>(NewNearest))
+			{
+				if (!Resource->IsDeath())
+				{
+					DesiredMode = Resource->GetInteractMode();
+				}
+			}
+			else if (AHB_Enemy_Base* Enemy = Cast<AHB_Enemy_Base>(NewNearest))
+			{
+				if (!Enemy->IsDeath())
+				{
+					DesiredMode = IM_AttackMode;
+				}
+			}
+
+			if (DesiredMode != CurrentMode)
+			{
+				SwitchInteractMode(HBCharacter, DesiredMode);
+			}
+		}
 	}
 }
 
@@ -109,12 +146,12 @@ void UHB_InteractSubsystem::SwitchInteractMode(ACharacter* InCharacter, EPlayerC
 	{
 		return;
 	}
-	UHB_InteractComponent* InteractComp = InCharacter->FindComponentByClass<UHB_InteractComponent>();
-	if (!InteractComp)
+	AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
+	if (!HBCharacter)
 	{
 		return;
 	}
-	const EPlayerCharacterInteractMode CurrentMode = InteractComp->GetInteractMode();
+	const EPlayerCharacterInteractMode CurrentMode = HBCharacter->GetInteractMode();
 	if (CurrentMode == NewMode)
 	{
 		return;
@@ -129,9 +166,8 @@ void UHB_InteractSubsystem::EnterInteractMode(ACharacter* InCharacter, EPlayerCh
 	{
 		return;
 	}
-	UHB_InteractComponent* InteractComp = InCharacter->FindComponentByClass<UHB_InteractComponent>();
 	AHeroBuilderCharacter* HeroBuilderCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
-	if (!InteractComp)
+	if (!HeroBuilderCharacter)
 	{
 		return;
 	}
@@ -164,8 +200,9 @@ void UHB_InteractSubsystem::EnterInteractMode(ACharacter* InCharacter, EPlayerCh
 	}
 	HeroBuilderCharacter->SetPreInteractDelay(InteractData->GetPreInteractDelay(EnterMode));
 	HeroBuilderCharacter->SetPostInteractDelay(InteractData->GetPostInteractDelay(EnterMode));
-	InteractComp->SetInteractMode(EnterMode);
-	UE_LOG(LogInteractSubsystem, Log, TEXT("'%s' Enter InteractMode '%d'!"), *GetNameSafe(InCharacter), (int32)EnterMode);
+	HeroBuilderCharacter->SetInteractMode(EnterMode);
+	const FString ModeName = StaticEnum<EPlayerCharacterInteractMode>()->GetNameStringByValue((int64)EnterMode);
+	UE_LOG(LogInteractSubsystem, Log, TEXT("'%s' Enter InteractMode '%s'!"), *GetNameSafe(InCharacter), *ModeName);
 }
 
 void UHB_InteractSubsystem::LeaveInteractMode(ACharacter* InCharacter, EPlayerCharacterInteractMode LeaveMode)
@@ -174,8 +211,8 @@ void UHB_InteractSubsystem::LeaveInteractMode(ACharacter* InCharacter, EPlayerCh
 	{
 		return;
 	}
-	UHB_InteractComponent* InteractComp = InCharacter->FindComponentByClass<UHB_InteractComponent>();
-	if (!InteractComp)
+	AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
+	if (!HBCharacter)
 	{
 		return;
 	}
@@ -206,8 +243,9 @@ void UHB_InteractSubsystem::LeaveInteractMode(ACharacter* InCharacter, EPlayerCh
 	default:
 		break;
 	}
-	InteractComp->SetInteractMode(IM_None);
-	UE_LOG(LogInteractSubsystem, Log, TEXT("'%s' Leave InteractMode '%d'!"), *GetNameSafe(InCharacter), (int32)LeaveMode);
+	HBCharacter->SetInteractMode(IM_None);
+	const FString ModeName = StaticEnum<EPlayerCharacterInteractMode>()->GetNameStringByValue((int64)LeaveMode);
+	UE_LOG(LogInteractSubsystem, Log, TEXT("'%s' Leave InteractMode '%s'!"), *GetNameSafe(InCharacter), *ModeName);
 }
 
 EPlayerCharacterInteractMode UHB_InteractSubsystem::GetInteractMode(ACharacter* InCharacter) const
@@ -216,12 +254,12 @@ EPlayerCharacterInteractMode UHB_InteractSubsystem::GetInteractMode(ACharacter* 
 	{
 		return IM_None;
 	}
-	UHB_InteractComponent* InteractComp = InCharacter->FindComponentByClass<UHB_InteractComponent>();
-	if (!InteractComp)
+	AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
+	if (!HBCharacter)
 	{
 		return IM_None;
 	}
-	return InteractComp->GetInteractMode();
+	return HBCharacter->GetInteractMode();
 }
 
 void UHB_InteractSubsystem::PreInteract(ACharacter* InCharacter)
@@ -246,6 +284,32 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 		return;
 	}
 	const EPlayerCharacterInteractMode Mode = GetInteractMode(InCharacter);
+
+	// 统一的“对当前交互目标造成伤害”辅助函数
+	auto ApplyInteractDamage = [this, InCharacter]()
+	{
+		AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
+		if (!HBCharacter)
+		{
+			return;
+		}
+		AActor* Target = HBCharacter->GetInteractTarget();
+		if (!IsValid(Target))
+		{
+			return;
+		}
+		// 伤害值来自角色自身的攻击力（Attack）属性
+		const float Damage = HBCharacter->GetAttack();
+		if (Damage <= 0.f)
+		{
+			return;
+		}
+		if (UHB_DamageSubsystem* DamageSys = GetWorld()->GetSubsystem<UHB_DamageSubsystem>())
+		{
+			DamageSys->TakeDamage(InCharacter, Damage, Target);
+		}
+	};
+
 	switch (Mode)
 	{
 	case IM_None:
@@ -259,16 +323,11 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 		}
 		break;
 	case IM_LumberMode:
-		//TODO: 触发砍伐交互
-		break;
 	case IM_GatherMode:
-		//TODO: 触发采集交互
-		break;
 	case IM_MineMode:
-		//TODO: 触发挖掘交互
-		break;
 	case IM_AttackMode:
-		//TODO: 触发攻击交互
+		// 砍伐/采集/挖掘/攻击：统一对当前交互目标造成伤害
+		ApplyInteractDamage();
 		break;
 	default:
 		break;

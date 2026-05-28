@@ -27,7 +27,13 @@ AHB_Building_Base::AHB_Building_Base()
 	BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BaseMesh"));
 	RotateMesh->SetupAttachment(RootComponent);
 	BaseMesh->SetupAttachment(RootComponent);
-	bIsServer = GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer;
+
+	// 创建血量 Widget 组件
+	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
+	HealthBarWidget->SetupAttachment(RootComponent);
+	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 150.f));
+	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	HealthBarWidget->SetDrawSize(FVector2D(150.f, 20.f));
 }
 
 void AHB_Building_Base::InitialBuilding(FBuildingConfig InConfig)
@@ -282,8 +288,8 @@ bool AHB_Building_Base::IsValidTarget(AActor* InTarget) const
 
 void AHB_Building_Base::ApplyDamage(AActor* Attacker, float Damage)
 {
-    CurrentHealth=FMath::Max(0, CurrentHealth - Damage);
-    if (CurrentHealth <= 0)
+    CurrentHealth = FMath::Max(0.f, CurrentHealth - Damage);
+    if (CurrentHealth <= 0.f)
     {
 		SwitchState(EBuildingState::BS_Death);
 		OnDeath();
@@ -297,4 +303,5 @@ void AHB_Building_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AHB_Building_Base, Target);
 	DOREPLIFETIME(AHB_Building_Base, CurrentHealth);
     DOREPLIFETIME(AHB_Building_Base, RotateMeshRotation);
+	DOREPLIFETIME(AHB_Building_Base, RotateSpeed);
 }

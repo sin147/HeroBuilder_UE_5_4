@@ -28,12 +28,22 @@ public:
 	template <typename T>
 	T* GetManager()
 	{
-        return Cast<AHeroBuilderGameMode>(UGameplayStatics::GetGameMode(this->GetWorld()))->GetManager<T>();
+		AHeroBuilderGameMode* GM = Cast<AHeroBuilderGameMode>(UGameplayStatics::GetGameMode(this->GetWorld()));
+		if (!GM)
+		{
+			return nullptr;
+		}
+		return GM->GetManager<T>();
 	}
 	template <typename T>
 	T* GetHelper()
 	{
-		return Cast<AHeroBuilderGameMode>(UGameplayStatics::GetGameMode(this->GetWorld()))->GetHelper<T>();
+		AHeroBuilderGameMode* GM = Cast<AHeroBuilderGameMode>(UGameplayStatics::GetGameMode(this->GetWorld()));
+		if (!GM)
+		{
+			return nullptr;
+		}
+		return GM->GetHelper<T>();
 	}
 
 };

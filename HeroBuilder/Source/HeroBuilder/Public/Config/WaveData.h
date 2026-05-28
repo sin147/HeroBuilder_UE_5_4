@@ -47,9 +47,16 @@ public:
     UPROPERTY(EditAnywhere)
     TMap<int32, FWaveConfig> WaveConfigs;
 
-    FWaveConfig GetWaveConfigByWaveIndex(int32 WaveIndex) const
+    bool GetWaveConfigByWaveIndex(int32 WaveIndex, FWaveConfig& OutConfig) const
     {
-        return *WaveConfigs.Find(WaveIndex);
+        const FWaveConfig* Found = WaveConfigs.Find(WaveIndex);
+        if (Found)
+        {
+            OutConfig = *Found;
+            return true;
+        }
+        UE_LOG(LogTemp, Error, TEXT("WaveConfig not found for WaveIndex %d"), WaveIndex);
+        return false;
     }
 
 };

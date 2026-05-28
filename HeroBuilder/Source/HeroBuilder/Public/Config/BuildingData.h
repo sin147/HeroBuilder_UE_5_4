@@ -39,9 +39,19 @@ class HEROBUILDER_API UBuildingData : public UDataAsset
 	GENERATED_BODY()
 
 private:
-	UPROPERTY(EditAnywhere, Category = "Building")
+	UPROPERTY(EditAnywhere, EditFixedSize, Category = "Building", meta = (ReadOnlyKeys))
 	TMap<TSubclassOf<AHB_Building_Base>,FBuildingConfig> BuildingInfoMap;
 public:
     FBuildingConfig GetBuildingInfoByBuildingClass(TSubclassOf<AHB_Building_Base> BuildingClass);
 	UStaticMesh* GetPreviewMeshByBuildingClass(TSubclassOf<AHB_Building_Base> BuildingClass);
+
+#if WITH_EDITOR
+protected:
+	virtual void PostInitProperties() override;
+	virtual void PostLoad() override;
+
+private:
+	//扫描所有AHB_Building_Base子类并同步到BuildingInfoMap
+	void RefreshBuildingInfoMap();
+#endif
 };

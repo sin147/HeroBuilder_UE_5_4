@@ -130,9 +130,22 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 		for (TPair<TObjectPtr<ACharacter>, TObjectPtr<AStaticMeshActor>> PreBuildingMeshActorPair : PreBuildingMeshActorMap)
 		{
 			AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(PreBuildingMeshActorPair.Key);
+			if (!PlayerCharacter)
+			{
+				continue;
+			}
 			AStaticMeshActor* BuildingMeshActor = PreBuildingMeshActorPair.Value;
+			if (!IsValid(BuildingMeshActor))
+			{
+				continue;
+			}
 			FVector PreviewLocation = PlayerCharacter->GetActorLocation() + PlayerCharacter->GetFollowCameraForward() * 200;
-			FVector2D GridIndex = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->CalulateGridIndexByLocation(PreviewLocation);
+			UHB_GridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UHB_GridSubsystem>();
+			if (!GridSubsystem)
+			{
+				continue;
+			}
+			FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(PreviewLocation);
 			BuildingMeshActor->SetActorLocation(FVector(GridWidth * GridIndex.X + GridWidth / 2, GridWidth * GridIndex.Y + GridWidth / 2, 0));
 		}
 	}

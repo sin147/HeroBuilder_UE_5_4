@@ -4,12 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/HB_WorldSubsystem_Base.h"
-#include "Component/HB_InteractComponent.h"
 #include "Config/InteractData.h"
 #include "HB_InteractSubsystem.generated.h"
 
 class ACharacter;
-class UHB_InteractComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogInteractSubsystem, Log, All);
 

@@ -72,8 +72,19 @@ TArray<FGridInfo> UHB_GridSubsystem::GetFreeGridIndexs()
 }
 FVector2D UHB_GridSubsystem::CalulateGridIndexByLocation(const FVector& Location) const
 {
-	int X =FMath::Floor(Location.X / GridData->GetGridWidth());
-	int Y =FMath::Floor(Location.Y / GridData->GetGridWidth());
+	if (!IsValid(GridData))
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("CalulateGridIndexByLocation: GridData is null"));
+		return FVector2D::ZeroVector;
+	}
+	const int32 Width = GridData->GetGridWidth();
+	if (Width == 0)
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("CalulateGridIndexByLocation: GridWidth is 0, cannot divide"));
+		return FVector2D::ZeroVector;
+	}
+	int X = FMath::Floor(Location.X / Width);
+	int Y = FMath::Floor(Location.Y / Width);
 
 	return FVector2D(X,Y);
 }

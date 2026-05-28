@@ -13,10 +13,12 @@ struct FGridInfo
 {
 	GENERATED_BODY()
 public:
-	FGridInfo() {}
+	FGridInfo() : X(0), Y(0) {}
 	FGridInfo(int32 InX,int32 InY):X(InX),Y(InY){}
-	int32 X;
-    int32 Y;
+	UPROPERTY()
+	int32 X = 0;
+	UPROPERTY()
+    int32 Y = 0;
 	bool operator==(const FGridInfo& Other) const
 	{
 		return Other.X == X && Other.Y == Y;
