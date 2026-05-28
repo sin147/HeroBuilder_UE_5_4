@@ -156,6 +156,8 @@ void UHB_InteractSubsystem::SwitchInteractMode(ACharacter* InCharacter, EPlayerC
 	{
 		return;
 	}
+	//模式即将切换：先中止角色当前正在进行的交互流程，避免旧动作/旧目标残留到新模式
+	HBCharacter->AbortInteract();
 	LeaveInteractMode(InCharacter, CurrentMode);
 	EnterInteractMode(InCharacter, NewMode);
 }

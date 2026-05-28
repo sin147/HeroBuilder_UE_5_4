@@ -6,6 +6,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Subsystems/HB_EnemySubsystem.h"
+#include "Components/HB_DamageComponent.h"
 
 DEFINE_LOG_CATEGORY(LogEnemy)
 
@@ -56,6 +57,9 @@ AHB_Enemy_Base::AHB_Enemy_Base()
 	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
 	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	HealthBarWidget->SetDrawSize(FVector2D(150.f, 20.f));
+
+	// 创建伤害组件
+	DamageComponent = CreateDefaultSubobject<UHB_DamageComponent>(TEXT("DamageComponent"));
 }
 
 bool AHB_Enemy_Base::IsDeath()
@@ -69,6 +73,17 @@ void AHB_Enemy_Base::BeginPlay()
 	Super::BeginPlay();
 	NetMode=GetWorld()->GetNetMode();
 	AIController = GetController<AAIController>();
+
+	// 绑定伤害组件回调
+	if (DamageComponent)
+	{
+		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Enemy_Base::HandleHealthChanged);
+		DamageComponent->OnDeath.AddDynamic(this, &AHB_Enemy_Base::HandleDeath);
+		if (HasAuthority())
+		{
+			DamageComponent->InitHealth(MaxHealth);
+		}
+	}
 }
 bool AHB_Enemy_Base::IsValidTarget(TObjectPtr<AActor> InBuilding)
 {
@@ -78,22 +93,18 @@ bool AHB_Enemy_Base::IsValidTarget(TObjectPtr<AActor> InBuilding)
 	}
 	return false;
 }
-void AHB_Enemy_Base::ApplyDamage(AActor* Attacker, float Damage)
+void AHB_Enemy_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
-	if (!HasAuthority())
+}
+
+void AHB_Enemy_Base::HandleDeath(AActor* Attacker)
+{
+	SwitchState(EEnemyState::ES_Death);
+	if (IsValid(AIController))
 	{
-		return;
+		AIController->StopMovement();
 	}
-	CurrentHealth -= Damage;
-	if (CurrentHealth <= 0)
-	{
-		SwitchState(EEnemyState::ES_Death);
-		if (IsValid(AIController))
-		{
-			AIController->StopMovement();
-		}
-		OnDeath();
-	}
+	OnDeath();
 }
 // Called every frame
 void AHB_Enemy_Base::Tick(float DeltaTime)
@@ -259,7 +270,6 @@ void AHB_Enemy_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AHB_Enemy_Base, CurrentState);
 	DOREPLIFETIME(AHB_Enemy_Base, Target);
-	DOREPLIFETIME(AHB_Enemy_Base, CurrentHealth);
 }
 
 void AHB_Enemy_Base::StartMove()

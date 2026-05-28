@@ -37,57 +37,6 @@ void UEnemyData::PostLoad()
 	RefreshEnemyInfoMap();
 }
 
-namespace
-{
-	// 判定一个UClass是否是“合法的可作为Map Key的游戏类”
-	// 用于过滤掉蓝图骨架类(SKEL_)、重新实例化中间类(REINST_)、
-	// 垃圾类(TRASHCLASS_)、热重载残留(HOTRELOADED_)、占位类(PLACEHOLDER-CLASS_)、
-	// 死亡类(DEADCLASS_)、抽象类、废弃类、旧版本类等
-	static bool IsValidGameplayClass(UClass* Class, UClass* BaseClass)
-	{
-		if (!Class || !BaseClass)
-		{
-			return false;
-		}
-		if (!Class->IsChildOf(BaseClass))
-		{
-			return false;
-		}
-
-		// 过滤抽象类、废弃类、存在更新版本的类
-		if (Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
-		{
-			return false;
-		}
-
-		// 过滤瞬态对象、销毁中、旧版本占位等RF标志
-		if (Class->HasAnyFlags(RF_NewerVersionExists | RF_BeginDestroyed | RF_FinishDestroyed))
-		{
-			return false;
-		}
-
-		// 过滤蓝图骨架类与各种中间/占位类
-		const FString ClassName = Class->GetName();
-		if (ClassName.StartsWith(TEXT("SKEL_"))
-			|| ClassName.StartsWith(TEXT("REINST_"))
-			|| ClassName.StartsWith(TEXT("TRASHCLASS_"))
-			|| ClassName.StartsWith(TEXT("HOTRELOADED_"))
-			|| ClassName.StartsWith(TEXT("PLACEHOLDER-CLASS_"))
-			|| ClassName.StartsWith(TEXT("DEADCLASS_")))
-		{
-			return false;
-		}
-
-		// 只接受权威类，避免中间类指针残留
-		if (Class->GetAuthoritativeClass() != Class)
-		{
-			return false;
-		}
-
-		return true;
-	}
-}
-
 void UEnemyData::RefreshEnemyInfoMap()
 {
 	// 收集所有AHB_Enemy_Base的子类（仅蓝图实例化用的真实子类）

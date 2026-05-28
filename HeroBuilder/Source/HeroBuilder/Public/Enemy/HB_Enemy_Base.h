@@ -4,11 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Interface/HB_DamageInterface.h"
 #include "AIController.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/WidgetComponent.h"
 #include "HB_Enemy_Base.generated.h"
+
+class UHB_DamageComponent;
 
 struct FEnemyConfig;
 class AHB_Building_Base;
@@ -27,7 +28,7 @@ enum EEnemyState : uint8
 
 
 UCLASS(Abstract)
-class HEROBUILDER_API AHB_Enemy_Base : public ACharacter,public IHB_DamageInterface
+class HEROBUILDER_API AHB_Enemy_Base : public ACharacter
 {
 	GENERATED_BODY()
 private:
@@ -44,10 +45,6 @@ private:
 	FTimerHandle DeathTimer;
 	ENetMode NetMode;
 	bool WasFindTarget = false;
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	float CurrentHealth = 100.f;
-	UPROPERTY(EditAnywhere, Category = "Attribute")
-	float MaxHealth = 100.f;
 	bool IsValidTarget(TObjectPtr<AActor> InBuilding);
 protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
@@ -66,6 +63,14 @@ protected:
 	/** 血量显示 Widget 组件，可在蓝图中指定 WidgetClass */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UWidgetComponent> HealthBarWidget;
+
+	/** 伤害组件：维护血量与伤害逻辑 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Damage")
+	TObjectPtr<UHB_DamageComponent> DamageComponent;
+
+	//初始血量
+	UPROPERTY(EditAnywhere, Category = "Attribute")
+	float MaxHealth = 100.f;
 
 	//攻击延迟
 	UPROPERTY(EditAnywhere, Category = "Attribute|Attack")
@@ -90,7 +95,13 @@ protected:
 
     void OnDeath();
 
-	virtual void ApplyDamage(AActor* Attacker, float Damage) override;
+	/** 由DamageComponent委托回调：血量变化 */
+	UFUNCTION()
+	void HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker);
+
+	/** 由DamageComponent委托回调：死亡 */
+	UFUNCTION()
+	void HandleDeath(AActor* Attacker);
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

@@ -6,9 +6,10 @@
 #include "GameFramework/Actor.h"
 #include "Config/ResourceData.h"
 #include "Config/InteractData.h"
-#include "Interface/HB_DamageInterface.h"
 #include "Components/WidgetComponent.h"
 #include "HB_Resource_Base.generated.h"
+
+class UHB_DamageComponent;
 
 struct FResourceConfig;
 DECLARE_LOG_CATEGORY_EXTERN(LogResource, Log, All);
@@ -25,15 +26,13 @@ enum EResourceState : uint8
 };
 
 UCLASS(Abstract)
-class HEROBUILDER_API AHB_Resource_Base : public AActor, public IHB_DamageInterface
+class HEROBUILDER_API AHB_Resource_Base : public AActor
 {
 	GENERATED_BODY()
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	float MaxHealth = 100.f;
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	float CurrentHealth = 100.f;
 
 	//受击后多少秒进入恢复状态（脱战恢复延迟）
 	UPROPERTY(EditAnywhere, Category = "Attribute")
@@ -81,6 +80,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UWidgetComponent> HealthBarWidget;
 
+	/** 伤害组件：维护血量与伤害逻辑 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Damage")
+	TObjectPtr<UHB_DamageComponent> DamageComponent;
+
 public:
 	// Sets default values for this actor's properties
 	AHB_Resource_Base();
@@ -118,7 +121,13 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnDeath();
 
-	virtual void ApplyDamage(AActor* Attacker, float Damage) override;
+	/** 由DamageComponent委托回调：血量变化 */
+	UFUNCTION()
+	void HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker);
+
+	/** 由DamageComponent委托回调：死亡 */
+	UFUNCTION()
+	void HandleDeath(AActor* Attacker);
 
 public:
 	// Called every frame

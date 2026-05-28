@@ -31,10 +31,6 @@ private:
 	TQueue<TObjectPtr<AHB_Building_Base>> FindTargetBuildingQueue;
 	int32 FindNumByTick = 20;
 	void TickFindTarget();
-	//待生成的建筑
-	TQueue<TPair<TSubclassOf<AHB_Building_Base>,FTransform>> SpawnBuildingQueue;
-	int32 SpawnNumByTick = 20;
-	void TickSpawnBuilding();
 	//待销毁的建筑
 	TQueue<TObjectPtr<AHB_Building_Base>> DestroyBuildingQueue;
 	int32 DestroyNumByTick = 20;

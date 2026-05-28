@@ -7,6 +7,7 @@
 #include "Enemy/HB_Enemy_Base.h"
 #include "Subsystems/HB_EnemySubsystem.h"
 #include "Subsystems/HB_BuildingSubsystem.h"
+#include "Components/HB_DamageComponent.h"
 
 DEFINE_LOG_CATEGORY(LogBuilding);
 
@@ -34,6 +35,9 @@ AHB_Building_Base::AHB_Building_Base()
 	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 150.f));
 	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	HealthBarWidget->SetDrawSize(FVector2D(150.f, 20.f));
+
+	// 创建伤害组件
+	DamageComponent = CreateDefaultSubobject<UHB_DamageComponent>(TEXT("DamageComponent"));
 }
 
 void AHB_Building_Base::InitialBuilding(FBuildingConfig InConfig)
@@ -84,6 +88,17 @@ bool AHB_Building_Base::SwitchState(EBuildingState NewState)
 void AHB_Building_Base::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 绑定伤害组件回调
+	if (DamageComponent)
+	{
+		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Building_Base::HandleHealthChanged);
+		DamageComponent->OnDeath.AddDynamic(this, &AHB_Building_Base::HandleDeath);
+		if (HasAuthority())
+		{
+			DamageComponent->InitHealth(MaxHealth);
+		}
+	}
 }
 
 // Called every frame
@@ -235,10 +250,9 @@ void AHB_Building_Base::Tick(float DeltaTime)
 	}
 }
 
-void AHB_Building_Base::OnClientApplyDamage(AActor* Attacker, float Damage)
+void AHB_Building_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
-	//客户端只做动画表现
-    UE_LOG(LogTemp, Log, TEXT("Client:CurrentlyHealth %lf"),Damage);
+	// 客户端/服务端均会触发：可在此处刷新血条UI等表现
 }
 
 bool AHB_Building_Base::IsDeath()
@@ -286,14 +300,10 @@ bool AHB_Building_Base::IsValidTarget(AActor* InTarget) const
 	return false;
 }
 
-void AHB_Building_Base::ApplyDamage(AActor* Attacker, float Damage)
+void AHB_Building_Base::HandleDeath(AActor* Attacker)
 {
-    CurrentHealth = FMath::Max(0.f, CurrentHealth - Damage);
-    if (CurrentHealth <= 0.f)
-    {
-		SwitchState(EBuildingState::BS_Death);
-		OnDeath();
-    }
+	SwitchState(EBuildingState::BS_Death);
+	OnDeath();
 }
 
 void AHB_Building_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -301,7 +311,6 @@ void AHB_Building_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHB_Building_Base, CurrentState);
 	DOREPLIFETIME(AHB_Building_Base, Target);
-	DOREPLIFETIME(AHB_Building_Base, CurrentHealth);
     DOREPLIFETIME(AHB_Building_Base, RotateMeshRotation);
 	DOREPLIFETIME(AHB_Building_Base, RotateSpeed);
 }

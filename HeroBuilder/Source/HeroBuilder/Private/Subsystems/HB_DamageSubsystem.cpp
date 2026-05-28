@@ -2,7 +2,7 @@
 
 
 #include "Subsystems/HB_DamageSubsystem.h"
-#include "Interface/HB_DamageInterface.h"
+#include "Components/HB_DamageComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/KismetMathLibrary.h"	
 
@@ -14,7 +14,7 @@ void UHB_DamageSubsystem::TakeDamage(AActor* Attacker, float Damage, AActor* Tar
 		UE_LOG(LogDamageSubsystem, Error, TEXT("TakeDamage called with invalid Target"));
 		return;
 	}
-	if(Cast<IHB_DamageInterface>(Target))
+	if (Target->FindComponentByClass<UHB_DamageComponent>())
 	{
 		DamageQueue.Enqueue(FDamageInfo(Attacker, Damage, Target));
 	}
@@ -164,11 +164,10 @@ void UHB_DamageSubsystem::Tick(float DeltaTime)
 				ProcessedCount++;
 				continue;
 			}
-			IHB_DamageInterface* DamageInterface = Cast<IHB_DamageInterface>(DamageInfo.Target);
-            if (DamageInterface)
-            {
-                DamageInterface->ApplyDamage(DamageInfo.Attacker, DamageInfo.Damage);
-            }
+			if (UHB_DamageComponent* DamageComp = DamageInfo.Target->FindComponentByClass<UHB_DamageComponent>())
+			{
+				DamageComp->ApplyDamage(DamageInfo.Attacker, DamageInfo.Damage);
+			}
 		}
 		ProcessedCount++;
 	}

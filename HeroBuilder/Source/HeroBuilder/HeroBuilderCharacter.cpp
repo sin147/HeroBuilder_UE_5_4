@@ -25,8 +25,10 @@ void AHeroBuilderCharacter::Server_Attack_Implementation()
 
 void AHeroBuilderCharacter::TickUpdateState(float DeltaTime)
 {
-	// 交互相关状态不应被移动打断
-	if (CurrentlyState == EPCS_PreInteract || CurrentlyState == EPCS_Interact || CurrentlyState == EPCS_PostInteract)
+	//处于交互流程中：交互期间已经在Move()里禁止了移动输入，这里无需再做任何状态切换，直接保持当前状态
+	if (CurrentlyState == EPCS_PreInteract ||
+		CurrentlyState == EPCS_Interact   ||
+		CurrentlyState == EPCS_PostInteract)
 	{
 		return;
 	}
@@ -45,8 +47,13 @@ void AHeroBuilderCharacter::TickUpdateState(float DeltaTime)
 
 }
 
-void AHeroBuilderCharacter::OnEnterState_Implementation(EPlayerCharacterState EnterState)
+void AHeroBuilderCharacter::OnEnterState(EPlayerCharacterState EnterState)
 {
+	//先把状态正式设置为目标值（保证OnRep只通知一次最终值），再决定是否需要进一步跳转
+	CurrentlyState = EnterState;
+	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)EnterState);
+	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Enter State '%s'!"), *GetNameSafe(this), *StateName);
+
 	switch (EnterState)
 	{
 	case EPCS_None:
@@ -57,27 +64,44 @@ void AHeroBuilderCharacter::OnEnterState_Implementation(EPlayerCharacterState En
 		break;
 	case EPCS_PreInteract:
 	{
-		CurrentInteractDelay = PreInteractDelay;
+		if (PreInteractDelay > 0.f)
+		{
+			CurrentInteractDelay = PreInteractDelay;
+		}
+		else
+		{
+			//无前摇：通过SwitchState正常进入Interact，保证Leave/Enter链完整
+			SwitchState(EPCS_Interact);
+		}
 		break;
 	}
 	case EPCS_Interact:
 	{
+		//进入交互帧：只触发一次交互，随即进入后摇。
+		//后续即使玩家仍按住交互键也不会重复触发，需要抬起后重新按下才会再次开启一轮流程。
+		Server_TryInteract();
+		SwitchState(EPCS_PostInteract);
 		break;
 	}
 	case EPCS_PostInteract:
 	{
-		CurrentInteractDelay = PostInteractDelay;
+		if (PostInteractDelay > 0.f)
+		{
+			CurrentInteractDelay = PostInteractDelay;
+		}
+		else
+		{
+			//无后摇：通过SwitchState正常回到Idle，保证Leave/Enter链完整
+			SwitchState(EPCS_Idle);
+		}
 		break;
 	}
 	default:
 		break;
 	}
-	CurrentlyState = EnterState;
-	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)EnterState);
-	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Enter State '%s'!"), *GetNameSafe(this), *StateName);
 }
 
-void AHeroBuilderCharacter::OnLeaveState_Implementation(EPlayerCharacterState LeaveState)
+void AHeroBuilderCharacter::OnLeaveState(EPlayerCharacterState LeaveState)
 {
 	switch (LeaveState)
 	{
@@ -105,7 +129,8 @@ void AHeroBuilderCharacter::OnLeaveState_Implementation(EPlayerCharacterState Le
 	default:
 		break;
 	}
-	CurrentlyState = EPCS_None;
+	//注意：不在此处把CurrentlyState置为EPCS_None，避免OnRep收到一次多余的中间值。
+	//最终状态会由紧随其后的OnEnterState统一设置。
 	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)LeaveState);
 	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' Leave State '%s'!"), *GetNameSafe(this), *StateName);
 }
@@ -150,6 +175,12 @@ AHeroBuilderCharacter::AHeroBuilderCharacter()
 
 void AHeroBuilderCharacter::SwitchState(EPlayerCharacterState NewState)
 {
+	//SwitchState 仅在服务端权威环境下生效（OnEnter/OnLeave已不是Server RPC，需在此把关）
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	if (CurrentlyState == NewState)
 	{
 		return;
@@ -157,6 +188,23 @@ void AHeroBuilderCharacter::SwitchState(EPlayerCharacterState NewState)
 
 	OnLeaveState(CurrentlyState);
 	OnEnterState(NewState);
+}
+
+void AHeroBuilderCharacter::AbortInteract()
+{
+	//只有处在交互流程中（前摇/交互/后摇）才需要中止
+	if (CurrentlyState != EPCS_PreInteract &&
+		CurrentlyState != EPCS_Interact &&
+		CurrentlyState != EPCS_PostInteract)
+	{
+		return;
+	}
+
+	//清零计时，避免被Tick残留消耗
+	CurrentInteractDelay = 0.f;
+	//直接切回Idle，OnLeaveState/OnEnterState会负责状态转换日志
+	SwitchState(EPCS_Idle);
+	UE_LOG(LogPlayerCharacter, Log, TEXT("'%s' AbortInteract: interact flow aborted."), *GetNameSafe(this));
 }
 
 void AHeroBuilderCharacter::SetPreInteractDelay(float Delay)
@@ -214,10 +262,6 @@ void AHeroBuilderCharacter::Tick(float DeltaTime)
 		}
 		case EPCS_Interact:
 		{
-			//交互帧已在OnEnterState中执行，这里直接进入后摇
-			SwitchState(EPCS_PostInteract);
-			//到达交互帧：服务端调用交互逻辑
-			Server_TryInteract();
 			break;
 		}
 		case EPCS_PostInteract:
@@ -288,8 +332,9 @@ void AHeroBuilderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 		// Construction Mode
         EnhancedInputComponent->BindAction(ChangeConstructionModeAction, ETriggerEvent::Started, this, &AHeroBuilderCharacter::ChangeConstructionMode);
 
-		// Interact
+		// Interact：长按保持交互，抬起取消
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AHeroBuilderCharacter::Interact);
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &AHeroBuilderCharacter::AbortInteract);
 	}
 	else
 	{
@@ -299,6 +344,14 @@ void AHeroBuilderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 void AHeroBuilderCharacter::Move(const FInputActionValue& Value)
 {
+	//交互优先：只要交互键仍按住，就禁止一切移动输入；抬起交互键后立即恢复
+	if (CurrentlyState == EPCS_PreInteract ||
+		CurrentlyState == EPCS_Interact   ||
+		CurrentlyState == EPCS_PostInteract)
+	{
+		return;
+	}
+
 	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
 

@@ -7,6 +7,7 @@
 #include "Config/ResourceData.h"
 #include "Components/BoxComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Components/HB_DamageComponent.h"
 
 DEFINE_LOG_CATEGORY(LogResource)
 
@@ -30,6 +31,9 @@ AHB_Resource_Base::AHB_Resource_Base()
 	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 80.f));
 	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	HealthBarWidget->SetDrawSize(FVector2D(120.f, 15.f));
+
+	// 创建伤害组件
+	DamageComponent = CreateDefaultSubobject<UHB_DamageComponent>(TEXT("DamageComponent"));
 }
 
 FString AHB_Resource_Base::GetStateName(EResourceState State)
@@ -69,46 +73,51 @@ void AHB_Resource_Base::BeginPlay()
 {
 	Super::BeginPlay();
 	NetMode = GetWorld()->GetNetMode();
+
+	// 绑定伤害组件回调
+	if (DamageComponent)
+	{
+		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Resource_Base::HandleHealthChanged);
+		DamageComponent->OnDeath.AddDynamic(this, &AHB_Resource_Base::HandleDeath);
+	}
+
 	if (HasAuthority())
 	{
-		CurrentHealth = MaxHealth;
+		if (DamageComponent)
+		{
+			DamageComponent->InitHealth(MaxHealth);
+		}
 		CurrentState = RS_Idle;
 	}
 }
 
-void AHB_Resource_Base::ApplyDamage(AActor* Attacker, float Damage)
+void AHB_Resource_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
+	// 只在服务端处理受击逻辑
 	if (!HasAuthority())
 	{
 		return;
 	}
-	if (IsDeath())
-	{
-		return;
-	}
 
-	CurrentHealth -= Damage;
-	UE_LOG(LogResource, Log, TEXT("Resource %s took %.1f damage, current health: %.1f"), *GetName(), Damage, CurrentHealth);
-
-	if (CurrentHealth <= 0.f)
+	// 被打且未死亡 -> 进入受击状态
+	if (NewHealth < OldHealth && NewHealth > 0.f)
 	{
-		CurrentHealth = 0.f;
-		SwitchState(RS_Death);
-		OnDeath();
-
-		// 通知子系统处理资源掉落与销毁
-		if (UHB_ResourceSubsystem* ResourceSubsystem = GetWorld()->GetSubsystem<UHB_ResourceSubsystem>())
-		{
-			ResourceSubsystem->OnResourceDeath(this);
-		}
-	}
-	else
-	{
-		// 进入受击状态
 		CurrentBeHitDuration = BeHitDuration;
 		CurrentRecoverDelay = RecoverDelay;
 		SwitchState(RS_BeHit);
 		OnBeHit(Attacker);
+	}
+}
+
+void AHB_Resource_Base::HandleDeath(AActor* Attacker)
+{
+	SwitchState(RS_Death);
+	OnDeath();
+
+	// 通知子系统处理资源掉落与销毁
+	if (UHB_ResourceSubsystem* ResourceSubsystem = GetWorld()->GetSubsystem<UHB_ResourceSubsystem>())
+	{
+		ResourceSubsystem->OnResourceDeath(this);
 	}
 }
 
@@ -127,7 +136,7 @@ void AHB_Resource_Base::Tick(float DeltaTime)
 	case RS_Idle:
 	{
 		// 满血则保持 Idle，未满血则等待脱战延迟过后切到 Recover
-		if (CurrentHealth < MaxHealth)
+		if (DamageComponent && DamageComponent->GetCurrentHealth() < DamageComponent->GetMaxHealth())
 		{
 			CurrentRecoverDelay -= DeltaTime;
 			if (CurrentRecoverDelay <= 0.f)
@@ -149,11 +158,13 @@ void AHB_Resource_Base::Tick(float DeltaTime)
 	}
 	case RS_Recover:
 	{
-		CurrentHealth += RecoverSpeed * DeltaTime;
-		if (CurrentHealth >= MaxHealth)
+		if (DamageComponent)
 		{
-			CurrentHealth = MaxHealth;
-			SwitchState(RS_Idle);
+			DamageComponent->Heal(RecoverSpeed * DeltaTime);
+			if (DamageComponent->GetCurrentHealth() >= DamageComponent->GetMaxHealth())
+			{
+				SwitchState(RS_Idle);
+			}
 		}
 		break;
 	}
@@ -182,7 +193,6 @@ void AHB_Resource_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHB_Resource_Base, CurrentState);
-	DOREPLIFETIME(AHB_Resource_Base, CurrentHealth);
 }
 
 void AHB_Resource_Base::InitialResource(const FResourceConfig& InConfig)
@@ -191,7 +201,10 @@ void AHB_Resource_Base::InitialResource(const FResourceConfig& InConfig)
 		*InConfig.ResourceName, static_cast<int32>(InConfig.ResourceType), InConfig.Health, InConfig.ResourceAmount);
 
 	MaxHealth = InConfig.Health;
-	CurrentHealth = MaxHealth;
+	if (DamageComponent)
+	{
+		DamageComponent->InitHealth(MaxHealth);
+	}
 	RecoverDelay = InConfig.RecoverDelay;
 	RecoverSpeed = InConfig.RecoverSpeed;
 	BeHitDuration = InConfig.BeHitDuration;

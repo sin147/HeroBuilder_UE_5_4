@@ -5,9 +5,10 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
-#include "Interface/HB_DamageInterface.h"
 #include "Components/WidgetComponent.h"
 #include "HB_Building_Base.generated.h"
+
+class UHB_DamageComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogBuilding, Log, All);
 
@@ -25,7 +26,7 @@ enum EBuildingState : uint8
 };
 
 UCLASS(Abstract)
-class HEROBUILDER_API AHB_Building_Base : public AActor,public IHB_DamageInterface
+class HEROBUILDER_API AHB_Building_Base : public AActor
 {
 	GENERATED_BODY()
 
@@ -40,8 +41,6 @@ private:
 	float PreAttackDelay = 1.f;
 	float PostAttackDelay = 1.f;
 	float CurrentAttackDelay = 0.f;
-	UPROPERTY(Replicated)
-	float CurrentHealth = 100.f;
 	float MaxHealth = 100.f;
 	float CombatRange=1000;
 	bool WasFindTarget = false;
@@ -68,8 +67,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UWidgetComponent> HealthBarWidget;
 
-	//当客户端应用伤害
-	void OnClientApplyDamage(AActor* Attacker, float Damage);
+	/** 伤害组件：维护血量与伤害逻辑 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Damage")
+	TObjectPtr<UHB_DamageComponent> DamageComponent;
+
 	//服务端死亡
 	void Server_Death();
 	//攻击表现
@@ -98,7 +99,15 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	TSubclassOf<AActor> TargetClass;
     bool IsValidTarget(AActor* InTarget) const;
-	virtual void ApplyDamage(AActor* Attacker, float Damage) override;
+
+	/** 由DamageComponent委托回调：血量变化 */
+	UFUNCTION()
+	void HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker);
+
+	/** 由DamageComponent委托回调：死亡 */
+	UFUNCTION()
+	void HandleDeath(AActor* Attacker);
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnDeath();
 public:	

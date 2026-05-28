@@ -92,79 +92,55 @@ void UHB_BuildingSubsystem::TickFindTarget()
 	}
 }
 
-void UHB_BuildingSubsystem::TickSpawnBuilding()
-{
-	if (NetMode != ENetMode::NM_Client && !SpawnBuildingQueue.IsEmpty())
-	{
-		UE_LOG(LogBuildingSystem, Verbose, TEXT("TickSpawnBuilding - Queue not empty"));
-		float CurrentlySpawnNum = 0;
-        while(!SpawnBuildingQueue.IsEmpty() && CurrentlySpawnNum < SpawnNumByTick)
-		{
-			//取出一个建筑
-			TPair<TSubclassOf<AHB_Building_Base>, FTransform> OutItem;
-			SpawnBuildingQueue.Dequeue(OutItem);
-			
-			if (OutItem.Key)
-			{
-				UE_LOG(LogBuildingSystem, Log, TEXT("Spawning building - Class: %s, Location: %s"), 
-					*OutItem.Key->GetName(), *OutItem.Value.GetLocation().ToString());
-				
-				//生成建筑
-				TObjectPtr<AHB_Building_Base> DeferredBuilding = GetWorld()->SpawnActorDeferred<AHB_Building_Base>(OutItem.Key, OutItem.Value);
-				if (IsValid(DeferredBuilding))
-				{
-					//初始化建筑数据
-					if (IsValid(BuildingData))
-					{
-						DeferredBuilding->InitialBuilding(BuildingData->GetBuildingInfoByBuildingClass(OutItem.Key));
-					}
-					else
-					{
-						UE_LOG(LogBuildingSystem, Warning, TEXT("BuildingData is not valid, using default building config"));
-						FBuildingConfig DefaultConfig;
-						DeferredBuilding->InitialBuilding(DefaultConfig);
-					}
-					UE_LOG(LogBuildingSystem, Log, TEXT("Successfully spawned building: %s"), *DeferredBuilding->GetName());
-					GetManager<AHB_BuildingManager>()->AddBuilding(DeferredBuilding);
-					DeferredBuilding->FinishSpawning(OutItem.Value);
-
-					OnSpawnBuilding.Broadcast(DeferredBuilding,OutItem.Value);
-				}
-				else
-				{
-					UE_LOG(LogBuildingSystem, Error, TEXT("Failed to spawn building: %s"), *OutItem.Key->GetName());
-				}
-			}
-			else
-			{
-				UE_LOG(LogBuildingSystem, Warning, TEXT("Skipping spawn due to null building class"));
-			}
-            CurrentlySpawnNum++;
-		}
-		UE_LOG(LogBuildingSystem, Verbose, TEXT("TickSpawnBuilding completed - Processed: %.0f buildings"), CurrentlySpawnNum);
-	}
-}
-
 void UHB_BuildingSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
 	TickFindTarget();
-	TickSpawnBuilding();
 }
 
 void UHB_BuildingSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass, const FTransform& InTransform)
 {
-	if (InClass)
+	//仅服务端生成建筑
+	if (NetMode == ENetMode::NM_Client)
 	{
-		UE_LOG(LogBuildingSystem, Log, TEXT("Adding building to spawn queue - Class: %s, Location: %s"), 
-			*InClass->GetName(), *InTransform.GetLocation().ToString());
+		return;
+	}
+
+	if (!InClass)
+	{
+		UE_LOG(LogBuildingSystem, Warning, TEXT("Attempted to spawn building with null class"));
+		return;
+	}
+
+	UE_LOG(LogBuildingSystem, Log, TEXT("Spawning building - Class: %s, Location: %s"),
+		*InClass->GetName(), *InTransform.GetLocation().ToString());
+
+	//生成建筑
+	TObjectPtr<AHB_Building_Base> DeferredBuilding = GetWorld()->SpawnActorDeferred<AHB_Building_Base>(InClass, InTransform);
+	if (!IsValid(DeferredBuilding))
+	{
+		UE_LOG(LogBuildingSystem, Error, TEXT("Failed to spawn building: %s"), *InClass->GetName());
+		return;
+	}
+
+	//初始化建筑数据
+	if (IsValid(BuildingData))
+	{
+		DeferredBuilding->InitialBuilding(BuildingData->GetBuildingInfoByBuildingClass(InClass));
 	}
 	else
 	{
-		UE_LOG(LogBuildingSystem, Warning, TEXT("Attempted to spawn building with null class"));
+		UE_LOG(LogBuildingSystem, Warning, TEXT("BuildingData is not valid, using default building config"));
+		FBuildingConfig DefaultConfig;
+		DeferredBuilding->InitialBuilding(DefaultConfig);
 	}
-	SpawnBuildingQueue.Enqueue(TPair<TSubclassOf<AHB_Building_Base>, FTransform>(InClass, InTransform));
+
+	UE_LOG(LogBuildingSystem, Log, TEXT("Successfully spawned building: %s"), *DeferredBuilding->GetName());
+	GetManager<AHB_BuildingManager>()->AddBuilding(DeferredBuilding);
+	DeferredBuilding->FinishSpawning(InTransform);
+
+	OnSpawnBuilding.Broadcast(DeferredBuilding, InTransform);
 }
 
 void UHB_BuildingSubsystem::DestroyBuilding(AHB_Building_Base*InBuilding)

@@ -92,13 +92,14 @@ class AHeroBuilderCharacter : public ACharacter
 	UFUNCTION(Server,Reliable)
 	void Server_Attack();
 	void TickUpdateState(float DeltaTime);
-	UFUNCTION(Server, Reliable)
+	//以下两个函数仅在服务端权威环境下调用（由SwitchState统一把关），无需走Server RPC
 	void OnEnterState(EPlayerCharacterState EnterState);
-	UFUNCTION(Server, Reliable)
 	void OnLeaveState(EPlayerCharacterState LeaveState);
 public:
 	AHeroBuilderCharacter();
 	void SwitchState(EPlayerCharacterState NewState);
+	//中止当前正在进行的交互流程（前摇/交互/后摇），将角色拉回Idle
+	void AbortInteract();
     void SetPreInteractDelay(float Delay);
     void SetPostInteractDelay(float Delay);
 	UFUNCTION(BlueprintPure)
