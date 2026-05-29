@@ -95,6 +95,8 @@ bool AHB_Enemy_Base::IsValidTarget(TObjectPtr<AActor> InBuilding)
 }
 void AHB_Enemy_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
+	// 调用蓝图可重写的 OnHealthChanged 接口
+	OnHealthChanged(OldHealth, NewHealth, MaxHealthValue, Attacker);
 }
 
 void AHB_Enemy_Base::HandleDeath(AActor* Attacker)
@@ -374,6 +376,9 @@ void AHB_Enemy_Base::InitialEnemy(const FEnemyConfig& InConfig)
 	
 	// 设置战斗范围
 	CombatRange = InConfig.CombatRange;
+	
+	// 设置攻击力
+	Attack = InConfig.Attack;
 	
 	// 设置攻击延迟
 	AttackPreDelay = InConfig.PreAttackDelay;

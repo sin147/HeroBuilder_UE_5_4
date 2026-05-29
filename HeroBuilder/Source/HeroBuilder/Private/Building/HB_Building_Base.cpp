@@ -252,7 +252,8 @@ void AHB_Building_Base::Tick(float DeltaTime)
 
 void AHB_Building_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
-	// 客户端/服务端均会触发：可在此处刷新血条UI等表现
+	// 调用蓝图可重写的 OnHealthChanged 接口
+	OnHealthChanged(OldHealth, NewHealth, MaxHealthValue, Attacker);
 }
 
 bool AHB_Building_Base::IsDeath()

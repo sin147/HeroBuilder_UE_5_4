@@ -10,6 +10,7 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogGridSubsystem, Log, All);
 class AHB_Building_Base;
+class AHB_Resource_Base;
 /**
  * 
  */
@@ -21,6 +22,8 @@ private:
 	TObjectPtr<UGridData> GridData;
 	void OnSpawnBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);
 	void OnDestroyBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);
+	void OnSpawnResource(AHB_Resource_Base* InResource, FTransform InTransform);
+	void OnDestroyResource(AHB_Resource_Base* InResource, FTransform InTransform);
 	int WitdhSize;
 	int HeightSize;
 public:

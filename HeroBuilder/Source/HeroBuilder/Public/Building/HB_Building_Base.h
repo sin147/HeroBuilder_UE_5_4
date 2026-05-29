@@ -12,6 +12,9 @@ class UHB_DamageComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogBuilding, Log, All);
 
+// 血量变化委托：旧值、新值、最大值、伤害来源
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnBuildingHealthChangedDelegate, float, OldHealth, float, NewHealth, float, MaxHealth, AActor*, Attacker);
+
 struct FBuildingConfig;
 
 UENUM(BlueprintType)
@@ -30,13 +33,18 @@ class HEROBUILDER_API AHB_Building_Base : public AActor
 {
 	GENERATED_BODY()
 
+public:
+	// 血量变化时调用（蓝图可重写）
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker);
+
 private:
 	UPROPERTY(Replicated)
     TObjectPtr<AActor> Target;
 	UPROPERTY(Replicated)
 	TEnumAsByte<EBuildingState> CurrentState;
 	bool SwitchState(EBuildingState NewState);
-	float Attack=10.f;
+	float Attack = 10.f;
 	float DeathTime = 10.f;
 	float PreAttackDelay = 1.f;
 	float PostAttackDelay = 1.f;
@@ -110,11 +118,16 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnDeath();
+
 public:	
 	void InitialBuilding(FBuildingConfig InConfig);
 	void SetTarget(AActor* InTarget);
 	bool IsDeath();
 	float GetCombatRange() const;
+
+	//获取攻击力
+	UFUNCTION(Category = "Attribute|Attack",BlueprintPure)
+	float GetAttack() { return Attack; }
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 

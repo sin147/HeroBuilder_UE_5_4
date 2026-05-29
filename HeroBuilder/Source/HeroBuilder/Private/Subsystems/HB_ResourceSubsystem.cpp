@@ -228,6 +228,8 @@ void UHB_ResourceSubsystem::TickSpawnResource()
 					GetManager<AHB_ResourceManager>()->AddResource(DeferredResource);
 					DeferredResource->FinishSpawning(OutItem.Value);
 					UE_LOG(LogResourceSubsystem, Log, TEXT("Successfully spawned resource: %s"), *DeferredResource->GetName());
+
+					OnSpawnResource.Broadcast(DeferredResource, OutItem.Value);
 				}
 				else
 				{
@@ -263,6 +265,7 @@ void UHB_ResourceSubsystem::DestroyResource(AHB_Resource_Base* InResource)
 	{
 		return;
 	}
+	OnDestroyResource.Broadcast(InResource, InResource->GetActorTransform());
 	GetManager<AHB_ResourceManager>()->RemoveResource(InResource);
 	InResource->Destroy();
 }

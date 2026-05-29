@@ -93,20 +93,21 @@ void AHB_Resource_Base::BeginPlay()
 
 void AHB_Resource_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
-	// 只在服务端处理受击逻辑
-	if (!HasAuthority())
+	// 先在服务端处理血量变化逻辑
+	if (HasAuthority())
 	{
-		return;
+		// 被打且未死亡 -> 进入受击状态
+		if (NewHealth < OldHealth && NewHealth > 0.f)
+		{
+			CurrentBeHitDuration = BeHitDuration;
+			CurrentRecoverDelay = RecoverDelay;
+			SwitchState(RS_BeHit);
+			OnBeHit(Attacker);
+		}
 	}
 
-	// 被打且未死亡 -> 进入受击状态
-	if (NewHealth < OldHealth && NewHealth > 0.f)
-	{
-		CurrentBeHitDuration = BeHitDuration;
-		CurrentRecoverDelay = RecoverDelay;
-		SwitchState(RS_BeHit);
-		OnBeHit(Attacker);
-	}
+	// 调用蓝图可重写的 OnHealthChanged 接口
+	OnHealthChanged(OldHealth, NewHealth, MaxHealthValue, Attacker);
 }
 
 void AHB_Resource_Base::HandleDeath(AActor* Attacker)

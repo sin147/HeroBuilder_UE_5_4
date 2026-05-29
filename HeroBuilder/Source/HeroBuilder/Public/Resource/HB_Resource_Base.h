@@ -14,6 +14,9 @@ class UHB_DamageComponent;
 struct FResourceConfig;
 DECLARE_LOG_CATEGORY_EXTERN(LogResource, Log, All);
 
+// 血量变化委托：旧值、新值、最大值、伤害来源
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnResourceHealthChangedDelegate, float, OldHealth, float, NewHealth, float, MaxHealth, AActor*, Attacker);
+
 class UBoxComponent;
 
 UENUM(BlueprintType)
@@ -29,6 +32,11 @@ UCLASS(Abstract)
 class HEROBUILDER_API AHB_Resource_Base : public AActor
 {
 	GENERATED_BODY()
+
+public:
+	// 血量变化时调用（蓝图可重写）
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker);
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Attribute")

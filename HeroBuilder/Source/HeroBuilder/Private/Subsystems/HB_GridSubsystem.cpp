@@ -3,6 +3,7 @@
 
 #include "Subsystems/HB_GridSubsystem.h"
 #include "Subsystems/HB_BuildingSubsystem.h"
+#include "Subsystems/HB_ResourceSubsystem.h"
 #include "Manager/HB_GridManager.h"
 
 DEFINE_LOG_CATEGORY(LogGridSubsystem);
@@ -33,6 +34,17 @@ void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	else
 	{
 		UE_LOG(LogGridSubsystem, Error, TEXT("Failed to get BuildingManager"));
+	}
+
+	// 订阅资源生成/销毁通知
+	if (UHB_ResourceSubsystem* Resource = GetWorld()->GetSubsystem<UHB_ResourceSubsystem>())
+	{
+		Resource->OnSpawnResource.AddUObject(this, &UHB_GridSubsystem::OnSpawnResource);
+		Resource->OnDestroyResource.AddUObject(this, &UHB_GridSubsystem::OnDestroyResource);
+	}
+	else
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("Failed to get ResourceSubsystem"));
 	}
 }
 int32 UHB_GridSubsystem::GetGridWidth() const
@@ -95,6 +107,18 @@ void UHB_GridSubsystem::OnSpawnBuilding(AHB_Building_Base* NewBuilding, FTransfo
 }
 
 void UHB_GridSubsystem::OnDestroyBuilding(AHB_Building_Base* InBuilding, FTransform InTransform)
+{
+	FVector2D GridIndex = CalulateGridIndexByLocation(InTransform.GetLocation());
+	GetManager<AHB_GridManager>()->RemoveUsedGridInfo(GridIndex.X, GridIndex.Y);
+}
+
+void UHB_GridSubsystem::OnSpawnResource(AHB_Resource_Base* InResource, FTransform InTransform)
+{
+	FVector2D GridIndex = CalulateGridIndexByLocation(InTransform.GetLocation());
+	GetManager<AHB_GridManager>()->CacheUsedGridInfo(GridIndex.X, GridIndex.Y);
+}
+
+void UHB_GridSubsystem::OnDestroyResource(AHB_Resource_Base* InResource, FTransform InTransform)
 {
 	FVector2D GridIndex = CalulateGridIndexByLocation(InTransform.GetLocation());
 	GetManager<AHB_GridManager>()->RemoveUsedGridInfo(GridIndex.X, GridIndex.Y);

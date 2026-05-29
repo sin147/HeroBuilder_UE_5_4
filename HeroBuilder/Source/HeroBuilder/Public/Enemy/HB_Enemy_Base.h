@@ -15,6 +15,11 @@ struct FEnemyConfig;
 class AHB_Building_Base;
 DECLARE_LOG_CATEGORY_EXTERN(LogEnemy, Log, All);
 
+// 血量变化委托：旧值、新值、最大值、伤害来源
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnEnemyHealthChangedDelegate, float, OldHealth, float, NewHealth, float, MaxHealth, AActor*, Attacker);
+
+class UBoxComponent;
+
 UENUM(BlueprintType)
 enum EEnemyState : uint8
 {
@@ -31,6 +36,12 @@ UCLASS(Abstract)
 class HEROBUILDER_API AHB_Enemy_Base : public ACharacter
 {
 	GENERATED_BODY()
+
+public:
+	// 血量变化时调用（蓝图可重写）
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker);
+
 private:
 	//是否死亡
 	UPROPERTY(EditAnywhere, Category = "Attribute")
@@ -56,6 +67,10 @@ public:
 	AHB_Enemy_Base();
 	bool IsDeath();
 
+	//获取攻击力
+    UFUNCTION(Category = "Attribute|Attack",BlueprintPure)
+	float GetAttack() { return Attack; }
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -69,8 +84,11 @@ protected:
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
 
 	//初始血量
-	UPROPERTY(EditAnywhere, Category = "Attribute")
 	float MaxHealth = 100.f;
+
+	//攻击力
+
+	float Attack = 10.f;
 
 	//攻击延迟
 	UPROPERTY(EditAnywhere, Category = "Attribute|Attack")
