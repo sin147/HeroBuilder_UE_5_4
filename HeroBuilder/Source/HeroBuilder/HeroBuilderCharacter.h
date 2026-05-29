@@ -174,6 +174,7 @@ protected:
 	//请求服务端中止当前交互流程（抬起交互键时由客户端发起）
 	UFUNCTION(Server, Reliable)
 	void Server_AbortInteract();
+	bool CanSwitchState(EPlayerCharacterState NewState, EPlayerCharacterState OldState);
 
 protected:
 	// APawn interface

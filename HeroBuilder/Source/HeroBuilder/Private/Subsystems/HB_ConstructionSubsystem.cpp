@@ -63,7 +63,7 @@ void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
 	if (NetMode != NM_Client)
 	{
 		AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingMeshActorMap[InCharacter];
-		if (bCanConstruction(InCharacter))
+		if (CheckCanConstruction(InCharacter))
 		{
 			GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuilding(BuildingClassMap[InCharacter], FTransform(TargetPreStaticMeshActor->GetActorRotation(), TargetPreStaticMeshActor->GetActorLocation(), TargetPreStaticMeshActor->GetActorScale()));
 		}
@@ -151,7 +151,7 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 	}
 }
 
-bool UHB_ConstructionSubsystem::bCanConstruction(ACharacter* InCharacter)
+bool UHB_ConstructionSubsystem::CheckCanConstruction(ACharacter* InCharacter)
 {
 	AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
 	AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingMeshActorMap[InCharacter];

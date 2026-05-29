@@ -27,7 +27,7 @@ private:
 	TMap<TObjectPtr<ACharacter>, TSubclassOf<AHB_Building_Base>> BuildingClassMap;
 	ENetMode NetMode;
 	void TickPreviewBuildingPos();
-	bool bCanConstruction(ACharacter* InCharacter);
+
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Tick(float DeltaTime) override;
@@ -35,6 +35,7 @@ public:
 	void Client_SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
     void Server_SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
 	void ConstructionBegin(ACharacter* InCharacter);
+	bool CheckCanConstruction(ACharacter* InCharacter);
 	void Client_ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
 	void Server_ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
 	void Client_CancelConstructionMode(TObjectPtr<ACharacter>InCharacter);

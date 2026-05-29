@@ -6,6 +6,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Subsystems/HB_ConstructionSubsystem.h"
 #include "GameFramework/Controller.h"
 #include "EnhancedInputComponent.h"
 #include "Subsystems/HB_InteractSubsystem.h"
@@ -203,9 +204,12 @@ void AHeroBuilderCharacter::SwitchState(EPlayerCharacterState NewState)
 	{
 		return;
 	}
+	if (CanSwitchState(NewState, CurrentlyState))
+	{
+		OnLeaveState(CurrentlyState);
+		OnEnterState(NewState);
+	}
 
-	OnLeaveState(CurrentlyState);
-	OnEnterState(NewState);
 }
 
 void AHeroBuilderCharacter::AbortInteract()
@@ -355,7 +359,7 @@ void AHeroBuilderCharacter::Tick(float DeltaTime)
 #endif
 #if !UE_SERVER
 	//非DedicatedServer构建：自治代理客户端跑一份只读/视觉处理
-	if (!HasAuthority() && GetLocalRole() == ROLE_AutonomousProxy)
+	if (GetWorld()->GetNetMode()!=NM_DedicatedServer)
 	{
 		Tick_LocalCosmetic(DeltaTime);
 	}
@@ -477,6 +481,41 @@ FVector AHeroBuilderCharacter::GetFollowCameraForward()
 
 //////////////////////////////////////////////////////////////////////////
 // Input
+
+bool AHeroBuilderCharacter::CanSwitchState(EPlayerCharacterState NewState, EPlayerCharacterState OldState)
+{
+	switch (NewState)
+	{
+	case EPCS_None:
+		break;
+	case EPCS_Idle:
+		break;
+	case EPCS_Move:
+		break;
+	case EPCS_MoveToTarget:
+		break;
+	case EPCS_PreInteract:
+	{
+		if (CurrentInteractMode == IM_ConstructionMode)
+		{
+			if (!GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->CheckCanConstruction(this))
+			{
+				SwitchState(EPCS_Idle);
+				return false;
+			}
+
+			return true;
+		}
+	}
+	case EPCS_Interact:
+		break;
+	case EPCS_PostInteract:
+		break;
+	default:
+		break;
+	}
+	return true;
+}
 
 void AHeroBuilderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
