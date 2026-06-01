@@ -1,44 +1,58 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Config/InteractData.h"
 #include "UObject/Class.h"
 #include "UObject/UnrealType.h"
 
-UAnimSequence* UInteractData::GetInteractAnimation(EPlayerCharacterInteractMode InteractMode)
+const FInteractInfo* UInteractData::FindInfoByType(EInteractManagerInteractMode InteractMode, EInteractType InteractType) const
 {
-    if (!InteractAnimationsMap.Contains(InteractMode))
+	if (const FInteractInfoArray* Arr = InteractAnimations.Find(InteractMode))
 	{
-		return nullptr;
+		for (const FInteractInfo& Info : Arr->Items)
+		{
+			if (Info.InteractType == InteractType)
+			{
+				return &Info;
+			}
+		}
 	}
-	return InteractAnimationsMap[InteractMode].InteractAnimation;
+	return nullptr;
 }
 
-float UInteractData::GetInteractDistance(EPlayerCharacterInteractMode InteractMode)
+UAnimSequence* UInteractData::GetInteractAnimation(EInteractManagerInteractMode InteractMode, EInteractType InteractType)
 {
-	if (!InteractAnimationsMap.Contains(InteractMode))
+	if (const FInteractInfo* Info = FindInfoByType(InteractMode, InteractType))
 	{
-		return 0.0f;
+		return Info->InteractAnimation;
 	}
-    return InteractAnimationsMap[InteractMode].InteractDistance;
+	return nullptr;
 }
 
-float UInteractData::GetPreInteractDelay(EPlayerCharacterInteractMode InteractMode)
+float UInteractData::GetInteractDistance(EInteractManagerInteractMode InteractMode, EInteractType InteractType)
 {
-	if (!InteractAnimationsMap.Contains(InteractMode))
+	if (const FInteractInfo* Info = FindInfoByType(InteractMode, InteractType))
 	{
-		return 9999.0f;
+		return Info->InteractDistance;
 	}
-    return InteractAnimationsMap[InteractMode].PreInteractDelay;
+	return 0.0f;
 }
 
-float UInteractData::GetPostInteractDelay(EPlayerCharacterInteractMode InteractMode)
+float UInteractData::GetPreInteractDelay(EInteractManagerInteractMode InteractMode, EInteractType InteractType)
 {
-	if (!InteractAnimationsMap.Contains(InteractMode))
+	if (const FInteractInfo* Info = FindInfoByType(InteractMode, InteractType))
 	{
-		return 9999.0f;
+		return Info->PreInteractDelay;
 	}
-    return InteractAnimationsMap[InteractMode].PostInteractDelay;
+	return 9999.0f;
+}
+
+float UInteractData::GetPostInteractDelay(EInteractManagerInteractMode InteractMode, EInteractType InteractType)
+{
+	if (const FInteractInfo* Info = FindInfoByType(InteractMode, InteractType))
+	{
+		return Info->PostInteractDelay;
+	}
+	return 9999.0f;
 }
 
 #if WITH_EDITOR
@@ -48,7 +62,7 @@ void UInteractData::PostInitProperties()
 	//新建实例时（包括CDO之外的真实实例）自动补齐所有枚举
 	if (!HasAnyFlags(RF_ClassDefaultObject | RF_NeedLoad | RF_NeedPostLoad))
 	{
-		RefreshInteractAnimationsMap();
+		RefreshInteractAnimations();
 	}
 }
 
@@ -56,70 +70,117 @@ void UInteractData::PostLoad()
 {
 	Super::PostLoad();
 	//从磁盘加载后补齐可能新增的枚举值
-	RefreshInteractAnimationsMap();
+	RefreshInteractAnimations();
 }
 
-void UInteractData::RefreshInteractAnimationsMap()
+void UInteractData::RefreshInteractAnimations()
 {
-	const UEnum* InteractModeEnum = StaticEnum<EPlayerCharacterInteractMode>();
-	if (!InteractModeEnum)
+	const UEnum* InteractModeEnum = StaticEnum<EInteractManagerInteractMode>();
+	const UEnum* InteractTypeEnum = StaticEnum<EInteractType>();
+	if (!InteractModeEnum || !InteractTypeEnum)
 	{
 		return;
 	}
 
-	// 收集所有合法的枚举值（排除最后一项自动生成的_MAX，并排除IM_None）
-	TSet<EPlayerCharacterInteractMode> AllInteractModes;
-	const int32 NumEnums = InteractModeEnum->NumEnums() - 1;
-	for (int32 i = 0; i < NumEnums; ++i)
+	// 收集所有合法的 Mode 枚举值（排除最后一项自动生成的_MAX）
+	TSet<EInteractManagerInteractMode> AllInteractModes;
 	{
-		const int64 EnumValue = InteractModeEnum->GetValueByIndex(i);
-		const EPlayerCharacterInteractMode Mode = static_cast<EPlayerCharacterInteractMode>(EnumValue);
-		// 跳过IM_None：它仅作为"无交互"的占位状态，不需要进入配置Map
-		if (Mode == IM_None)
+		const int32 NumEnums = InteractModeEnum->NumEnums() - 1;
+		for (int32 i = 0; i < NumEnums; ++i)
 		{
-			continue;
+			const int64 EnumValue = InteractModeEnum->GetValueByIndex(i);
+			AllInteractModes.Add(static_cast<EInteractManagerInteractMode>(EnumValue));
 		}
-		AllInteractModes.Add(Mode);
+	}
+
+	// 收集所有合法的 Type 枚举值（保留枚举顺序，便于排序）
+	TArray<EInteractType> AllInteractTypes;
+	TSet<EInteractType>   AllInteractTypeSet;
+	{
+		const int32 NumEnums = InteractTypeEnum->NumEnums() - 1;
+		AllInteractTypes.Reserve(NumEnums);
+		for (int32 i = 0; i < NumEnums; ++i)
+		{
+			const EInteractType TypeValue = static_cast<EInteractType>(InteractTypeEnum->GetValueByIndex(i));
+			AllInteractTypes.Add(TypeValue);
+			AllInteractTypeSet.Add(TypeValue);
+		}
 	}
 
 	bool bChanged = false;
 
-	// 主动剔除无效/重复/异常Key
-	// 1) 不在AllInteractModes中的Key（例如已被删除的旧枚举值、_MAX占位等）
-	// 2) 同一枚举值的重复Key（保险）
-	TSet<EPlayerCharacterInteractMode> SeenModes;
-	for (auto It = InteractAnimationsMap.CreateIterator(); It; ++It)
+	// 主动剔除无效 Mode Key
+	for (auto It = InteractAnimations.CreateIterator(); It; ++It)
 	{
-		const EPlayerCharacterInteractMode KeyMode = static_cast<EPlayerCharacterInteractMode>(It.Key().GetValue());
-
-		// 异常/不再合法的Key
+		const EInteractManagerInteractMode KeyMode = static_cast<EInteractManagerInteractMode>(It.Key().GetValue());
 		if (!AllInteractModes.Contains(KeyMode))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("InteractData: 剔除非法Key %d"), static_cast<int32>(KeyMode));
-			It.RemoveCurrent();
-			bChanged = true;
-			continue;
-		}
-
-		// 重复Key（保险逻辑）
-		bool bAlreadySeen = false;
-		SeenModes.Add(KeyMode, &bAlreadySeen);
-		if (bAlreadySeen)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("InteractData: 剔除重复Key %d"), static_cast<int32>(KeyMode));
+			UE_LOG(LogTemp, Warning, TEXT("InteractData: 剔除非法Mode Key %d"), static_cast<int32>(KeyMode));
 			It.RemoveCurrent();
 			bChanged = true;
 		}
 	}
 
-	// 添加缺失的枚举值（已存在的保留原配置）
-	for (const EPlayerCharacterInteractMode& Mode : AllInteractModes)
+	// 添加缺失的 Mode Key
+	for (const EInteractManagerInteractMode& Mode : AllInteractModes)
 	{
-		if (!InteractAnimationsMap.Contains(Mode))
+		if (!InteractAnimations.Contains(Mode))
 		{
-			InteractAnimationsMap.Add(Mode, FInteractInfo());
+			InteractAnimations.Add(Mode, FInteractInfoArray());
 			bChanged = true;
 		}
+	}
+
+	// 对每个 Mode 的 Items 按 EInteractType 补齐/裁剪/排序
+	for (auto& Pair : InteractAnimations)
+	{
+		FInteractInfoArray& Arr = Pair.Value;
+
+		// 1) 剔除非法 Type 与重复 Type，保留每个 Type 的首个出现
+		TSet<EInteractType> SeenTypes;
+		for (int32 i = Arr.Items.Num() - 1; i >= 0; --i)
+		{
+			const EInteractType T = static_cast<EInteractType>(Arr.Items[i].InteractType.GetValue());
+			if (!AllInteractTypeSet.Contains(T))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("InteractData: 剔除非法Type %d"), static_cast<int32>(T));
+				Arr.Items.RemoveAt(i);
+				bChanged = true;
+				continue;
+			}
+		}
+		// 第二遍正向扫描去重（保留靠前者）
+		for (int32 i = 0; i < Arr.Items.Num();)
+		{
+			const EInteractType T = static_cast<EInteractType>(Arr.Items[i].InteractType.GetValue());
+			if (SeenTypes.Contains(T))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("InteractData: 剔除重复Type %d"), static_cast<int32>(T));
+				Arr.Items.RemoveAt(i);
+				bChanged = true;
+				continue;
+			}
+			SeenTypes.Add(T);
+			++i;
+		}
+
+		// 2) 补齐缺失的 Type
+		for (const EInteractType T : AllInteractTypes)
+		{
+			if (!SeenTypes.Contains(T))
+			{
+				FInteractInfo NewInfo;
+				NewInfo.InteractType = T;
+				Arr.Items.Add(NewInfo);
+				bChanged = true;
+			}
+		}
+
+		// 3) 按 EInteractType 枚举顺序排序，编辑器内观感稳定
+		Arr.Items.Sort([](const FInteractInfo& A, const FInteractInfo& B)
+		{
+			return static_cast<uint8>(A.InteractType.GetValue()) < static_cast<uint8>(B.InteractType.GetValue());
+		});
 	}
 
 	if (bChanged)

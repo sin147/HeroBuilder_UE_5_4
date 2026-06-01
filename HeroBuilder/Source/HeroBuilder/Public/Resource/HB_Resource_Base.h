@@ -68,9 +68,9 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
 	int32 ResourceAmount = 10;
 
-	//玩家靠近此资源时应自动切换到的交互模式（例如树木→IM_LumberMode、矿石→IM_MineMode）
+	//玩家靠近此资源时应自动切换到的交互模式（例如树木→IT_LumberMode、矿石→IT_MineMode）
 	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
-	TEnumAsByte<EPlayerCharacterInteractMode> InteractMode = IM_Normal;
+	TEnumAsByte<EInteractType> InteractMode = IT_Normal;
 
 protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
@@ -111,7 +111,7 @@ public:
 
 	//获取该资源关联的交互模式
 	UFUNCTION(BlueprintCallable)
-	EPlayerCharacterInteractMode GetInteractMode() const { return InteractMode; }
+	EInteractType GetInteractMode() const { return InteractMode; }
 
 protected:
 	// Called when the game starts or when spawned

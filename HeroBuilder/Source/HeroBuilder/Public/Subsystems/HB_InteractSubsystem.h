@@ -5,9 +5,11 @@
 #include "CoreMinimal.h"
 #include "Subsystems/HB_WorldSubsystem_Base.h"
 #include "Config/InteractData.h"
+#include "Manager/HB_InteractManager.h"
 #include "HB_InteractSubsystem.generated.h"
 
 class ACharacter;
+class AHB_InteractManager;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogInteractSubsystem, Log, All);
 
@@ -24,6 +26,10 @@ private:
 	//玩家控制器列表
 	TArray<APlayerController*> PlayerControllers;
 
+	//单例 InteractManager 缓存（懒查找：服务端按需Spawn，客户端通过Replication拿到）
+	UPROPERTY()
+	mutable TObjectPtr<AHB_InteractManager> CachedInteractManager;
+
 	//交互检测距离
 	float InteractTraceDistance = 500.f;
 
@@ -35,15 +41,29 @@ protected:
 	virtual void OnPlayerLogin(AGameModeBase* GameMode, APlayerController* PlayerController) override;
 	virtual void OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting) override;
 public:
+	//获取单例 InteractManager；服务端在缺失时按需Spawn一个，客户端只读取已复制的实例
+	AHB_InteractManager* GetInteractManager() const;
+
 	//切换玩家交互模式
-	void SwitchInteractMode(ACharacter* InCharacter, EPlayerCharacterInteractMode NewMode);
+	void SwitchInteractType(ACharacter* InCharacter, EInteractType NewMode);
 	//进入交互模式
-	void EnterInteractMode(ACharacter* InCharacter, EPlayerCharacterInteractMode EnterMode);
+	void EnterInteractType(ACharacter* InCharacter, EInteractType EnterMode);
 	//离开交互模式
-	void LeaveInteractMode(ACharacter* InCharacter, EPlayerCharacterInteractMode LeaveMode);
+	void LeaveInteractType(ACharacter* InCharacter, EInteractType LeaveMode);
 	//获取玩家当前的交互模式
 	UFUNCTION(BlueprintCallable)
-	EPlayerCharacterInteractMode GetInteractMode(ACharacter* InCharacter) const;
+	EInteractType GetInteractType(ACharacter* InCharacter) const;
+	//获取玩家当前的交互模式（建造/正常）
+    UFUNCTION(BlueprintCallable)
+	EInteractManagerInteractMode GetInteractMode(ACharacter* InCharacter) const;
+	//设置玩家当前的交互模式（建造/正常）—— 纯Setter：仅写表，无副作用
+	void SetCurrentInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode NewMode);
+	//切换玩家交互模式（建造/正常）：负责 Leave + Enter 一条龙
+	void SwitchInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode NewMode);
+	//进入交互模式（建造/正常）
+	void EnterInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode EnterMode);
+	//离开交互模式（建造/正常）
+	void LeaveInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode LeaveMode);
 	//准备交互（在角色进入交互模式时调用）
 	void PreInteract(ACharacter* InCharacter);
 	//Post交互（在角色离开交互模式时调用）
@@ -53,5 +73,5 @@ public:
 	void TryInteract(ACharacter* InCharacter);
 	//获取交互动画
 	UFUNCTION(BlueprintCallable)
-	UAnimSequence* GetInteractAnim(EPlayerCharacterInteractMode InteractMode) const;
+	UAnimSequence* GetInteractAnim(EInteractManagerInteractMode InteractMode, EInteractType InteractType) const;
 };

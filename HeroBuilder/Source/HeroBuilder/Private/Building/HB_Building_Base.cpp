@@ -234,16 +234,10 @@ void AHB_Building_Base::Tick(float DeltaTime)
 			break;
 		}
 		case EBuildingState::BS_Death:
-			if(DeathTime>0)
-			{
-				DeathTime -= DeltaTime;
-			}
-			else
-			{
-				SetActorTickEnabled(false);
-				GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->DestroyBuilding(this);
-			}
+		{
+			SetActorTickEnabled(false);
 			break;
+		}
 		default:
 			break;
 		}
@@ -304,7 +298,6 @@ bool AHB_Building_Base::IsValidTarget(AActor* InTarget) const
 void AHB_Building_Base::HandleDeath(AActor* Attacker)
 {
 	SwitchState(EBuildingState::BS_Death);
-	OnDeath();
 }
 
 void AHB_Building_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -47,7 +47,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Resource", SimpleDisplay = "死亡掉落资源数量")
 	int32 ResourceAmount = 10;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Resource", SimpleDisplay = "交互模式")
-	TEnumAsByte<EPlayerCharacterInteractMode> InteractMode = IM_Normal;
+	TEnumAsByte<EInteractType> InteractMode = IT_Normal;
 };
 
 /**

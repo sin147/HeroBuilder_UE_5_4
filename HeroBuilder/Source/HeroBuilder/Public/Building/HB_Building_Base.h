@@ -42,7 +42,7 @@ private:
 	UPROPERTY(Replicated)
     TObjectPtr<AActor> Target;
 	UPROPERTY(Replicated)
-	TEnumAsByte<EBuildingState> CurrentState;
+    TEnumAsByte<EBuildingState> CurrentState = BS_Death;
 	bool SwitchState(EBuildingState NewState);
 	float Attack = 10.f;
 	float DeathTime = 10.f;
@@ -115,9 +115,6 @@ protected:
 	/** 由DamageComponent委托回调：死亡 */
 	UFUNCTION()
 	void HandleDeath(AActor* Attacker);
-
-	UFUNCTION(BlueprintImplementableEvent)
-	void OnDeath();
 
 public:	
 	void InitialBuilding(FBuildingConfig InConfig);
