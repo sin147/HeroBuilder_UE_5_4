@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+ï»¿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Subsystems/HB_CharacterSubsystem.h"
@@ -17,15 +17,15 @@
 
 DEFINE_LOG_CATEGORY(LogCharacterSubsystem);
 
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
-// Tick / Player ÊÂ¼ş
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// Tick / Player äº‹ä»¶
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 void UHB_CharacterSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	//·şÎñ¶Ë£º±éÀúÒÑ×¢²á½ÇÉ«ÍÆ½øÈ¨Íş×´Ì¬»ú
+	//æœåŠ¡ç«¯ï¼šéå†å·²æ³¨å†Œè§’è‰²æ¨è¿›æƒå¨çŠ¶æ€æœº
 	if (NetMode != ENetMode::NM_Client)
 	{
 		for (int32 Idx = RegisteredCharacters.Num() - 1; Idx >= 0; --Idx)
@@ -40,7 +40,7 @@ void UHB_CharacterSubsystem::Tick(float DeltaTime)
 		}
 	}
 #if !UE_SERVER
-	//·ÇDedicatedServer¹¹½¨£º¿Í»§¶ËÍ¨¹ıManager±íÏîÇı¶¯±¾µØÊÓ¾õ´¦Àí
+	//éDedicatedServeræ„å»ºï¼šå®¢æˆ·ç«¯é€šè¿‡Managerè¡¨é¡¹é©±åŠ¨æœ¬åœ°è§†è§‰å¤„ç†
 	if (GetWorld() && GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
 		AHB_CharacterManager* Mgr = GetCharacterManager();
@@ -54,7 +54,7 @@ void UHB_CharacterSubsystem::Tick(float DeltaTime)
 			{
 				continue;
 			}
-			//·şÎñ¶Ë»úÆ÷ÔÚÉÏÃæµÄÑ­»·ÀïÒÑ´¦Àí¹ı£¨Tick_LocalCosmeticÒ²»á×ß£©£¬ÕâÀï½öÔÚ´¿¿Í»§¶Ë»úÆ÷ÉÏÅÜ
+			//æœåŠ¡ç«¯æœºå™¨åœ¨ä¸Šé¢çš„å¾ªç¯é‡Œå·²å¤„ç†è¿‡ï¼ˆTick_LocalCosmeticä¹Ÿä¼šèµ°ï¼‰ï¼Œè¿™é‡Œä»…åœ¨çº¯å®¢æˆ·ç«¯æœºå™¨ä¸Šè·‘
 			if (NetMode == ENetMode::NM_Client)
 			{
 				Tick_LocalCosmetic(Entry.Character, DeltaTime);
@@ -67,7 +67,7 @@ void UHB_CharacterSubsystem::Tick(float DeltaTime)
 void UHB_CharacterSubsystem::OnPlayerLogin(AGameModeBase* GameMode, APlayerController* PlayerController)
 {
 	Super::OnPlayerLogin(GameMode, PlayerController);
-	//Ê×¸öÍæ¼ÒµÇÂ¼Ê±°´ĞèSpawnµ¥Àı CharacterManager
+	//é¦–ä¸ªç©å®¶ç™»å½•æ—¶æŒ‰éœ€Spawnå•ä¾‹ CharacterManager
 	GetCharacterManager();
 }
 
@@ -85,9 +85,9 @@ void UHB_CharacterSubsystem::OnPlayerLogout(AGameModeBase* GameMode, AController
 	}
 }
 
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
-// Manager ·ÃÎÊ
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// Manager è®¿é—®
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 AHB_CharacterManager* UHB_CharacterSubsystem::GetCharacterManager() const
 {
@@ -112,7 +112,7 @@ AHB_CharacterManager* UHB_CharacterSubsystem::GetCharacterManager() const
 		}
 	}
 
-	//½ö·şÎñ¶ËÓĞÈ¨ÏŞSpawn
+	//ä»…æœåŠ¡ç«¯æœ‰æƒé™Spawn
 	if (NetMode != ENetMode::NM_Client)
 	{
 		FActorSpawnParameters SpawnParams;
@@ -128,9 +128,9 @@ AHB_CharacterManager* UHB_CharacterSubsystem::GetCharacterManager() const
 	return nullptr;
 }
 
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
-// ½ÇÉ«×¢²á
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// è§’è‰²æ³¨å†Œ
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 void UHB_CharacterSubsystem::RegisterCharacter(ACharacter* InCharacter)
 {
@@ -138,13 +138,13 @@ void UHB_CharacterSubsystem::RegisterCharacter(ACharacter* InCharacter)
 	{
 		return;
 	}
-	//½ö·şÎñ¶ËĞ´±íÏî
+	//ä»…æœåŠ¡ç«¯å†™è¡¨é¡¹
 	if (NetMode != ENetMode::NM_Client)
 	{
 		if (AHB_CharacterManager* Mgr = GetCharacterManager())
 		{
 			Mgr->RegisterCharacter(InCharacter);
-			//Ä¬ÈÏ³õÊ¼ÎªIdle
+			//é»˜è®¤åˆå§‹ä¸ºIdle
 			Mgr->SetCurrentlyState(InCharacter, EPCS_Idle);
 		}
 		RegisteredCharacters.AddUnique(InCharacter);
@@ -167,9 +167,9 @@ void UHB_CharacterSubsystem::UnregisterCharacter(ACharacter* InCharacter)
 	}
 }
 
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
-// Í¬²½ÊôĞÔGetter / Setter£¨Í¸´«Manager£©
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// åŒæ­¥å±æ€§Getter / Setterï¼ˆé€ä¼ Managerï¼‰
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 EPlayerCharacterState UHB_CharacterSubsystem::GetCurrentState(ACharacter* InCharacter) const
 {
@@ -270,9 +270,9 @@ bool UHB_CharacterSubsystem::IsValidTarget(AActor* Target) const
 	return !DamageComp->IsDead();
 }
 
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
-// ×´Ì¬»ú£ºSwitchState / OnEnter / OnLeave / CanSwitch
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// çŠ¶æ€æœºï¼šSwitchState / OnEnter / OnLeave / CanSwitch
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 void UHB_CharacterSubsystem::SwitchState(ACharacter* InCharacter, EPlayerCharacterState NewState)
 {
@@ -280,7 +280,7 @@ void UHB_CharacterSubsystem::SwitchState(ACharacter* InCharacter, EPlayerCharact
 	{
 		return;
 	}
-	//SwitchState ½öÔÚ·şÎñ¶ËÈ¨Íş»·¾³ÏÂÉúĞ§
+	//SwitchState ä»…åœ¨æœåŠ¡ç«¯æƒå¨ç¯å¢ƒä¸‹ç”Ÿæ•ˆ
 	if (!InCharacter->HasAuthority())
 	{
 		return;
@@ -344,7 +344,7 @@ void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharac
 	{
 		return;
 	}
-	//ÏÈÕıÊ½Âä±í£¬±£Ö¤OnRepÖ»Í¨ÖªÒ»´Î×îÖÕÖµ
+	//å…ˆæ­£å¼è½è¡¨ï¼Œä¿è¯OnRepåªé€šçŸ¥ä¸€æ¬¡æœ€ç»ˆå€¼
 	Mgr->SetCurrentlyState(InCharacter, EnterState);
 	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)EnterState);
 	UE_LOG(LogCharacterSubsystem, Log, TEXT("'%s' Enter State '%s'!"), *GetNameSafe(InCharacter), *StateName);
@@ -358,7 +358,7 @@ void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharac
 	case EPCS_Move:
 		break;
 	case EPCS_MoveToTarget:
-		//×·»÷Ä¿±ê½øÈëÌ¬£ºÊ²Ã´¶¼²»×ö£¬ÓÉTickÇı¶¯×·»÷
+		//è¿½å‡»ç›®æ ‡è¿›å…¥æ€ï¼šä»€ä¹ˆéƒ½ä¸åšï¼Œç”±Tické©±åŠ¨è¿½å‡»
 		break;
 	case EPCS_PreInteract:
 	{
@@ -369,14 +369,14 @@ void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharac
 		}
 		else
 		{
-			//ÎŞÇ°Ò¡£ºÍ¨¹ıSwitchStateÕı³£½øÈëInteract£¬±£Ö¤Leave/EnterÁ´ÍêÕû
+			//æ— å‰æ‘‡ï¼šé€šè¿‡SwitchStateæ­£å¸¸è¿›å…¥Interactï¼Œä¿è¯Leave/Enteré“¾å®Œæ•´
 			SwitchState(InCharacter, EPCS_Interact);
 		}
 		break;
 	}
 	case EPCS_Interact:
 	{
-		//½øÈë½»»¥Ö¡£ºÖ»´¥·¢Ò»´Î½»»¥£¬Ëæ¼´½øÈëºóÒ¡
+		//è¿›å…¥äº¤äº’å¸§ï¼šåªè§¦å‘ä¸€æ¬¡äº¤äº’ï¼Œéšå³è¿›å…¥åæ‘‡
 		if (UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>())
 		{
 			InteractSys->TryInteract(InCharacter);
@@ -451,7 +451,7 @@ void UHB_CharacterSubsystem::AbortInteract(ACharacter* InCharacter)
 		return;
 	}
 	const EPlayerCharacterState State = Mgr->GetCurrentlyState(InCharacter);
-	//Ö»ÓĞ´¦ÔÚ½»»¥Á÷³ÌÖĞ£¨×·»÷/Ç°Ò¡/½»»¥/ºóÒ¡£©²ÅĞèÒªÖĞÖ¹
+	//åªæœ‰å¤„åœ¨äº¤äº’æµç¨‹ä¸­ï¼ˆè¿½å‡»/å‰æ‘‡/äº¤äº’/åæ‘‡ï¼‰æ‰éœ€è¦ä¸­æ­¢
 	if (State != EPCS_MoveToTarget &&
 		State != EPCS_PreInteract  &&
 		State != EPCS_Interact     &&
@@ -459,7 +459,7 @@ void UHB_CharacterSubsystem::AbortInteract(ACharacter* InCharacter)
 	{
 		return;
 	}
-	//ÇåÁã¼ÆÊ±£¬±ÜÃâ±»Tick²ĞÁôÏûºÄ
+	//æ¸…é›¶è®¡æ—¶ï¼Œé¿å…è¢«Tickæ®‹ç•™æ¶ˆè€—
 	Mgr->SetCurrentInteractDelay(InCharacter, 0.f);
 	SwitchState(InCharacter, EPCS_Idle);
 	UE_LOG(LogCharacterSubsystem, Log, TEXT("'%s' AbortInteract: interact flow aborted."), *GetNameSafe(InCharacter));
@@ -476,9 +476,25 @@ void UHB_CharacterSubsystem::BeginInteractFlow(ACharacter* InCharacter)
 	{
 		return;
 	}
+	
+	//è·å–InteractManageræ¥åˆ¤æ–­å½“å‰äº¤äº’æ¨¡å¼
+	AHB_InteractManager* InteractMgr = GetManager<AHB_InteractManager>();
+	if (!InteractMgr)
+	{
+		return;
+	}
+	
 	AActor* Target = Mgr->GetInteractTarget(InCharacter);
 	const float Range = Mgr->GetInteractRange(InCharacter);
-	//ÓĞ½»»¥Ä¿±êÇÒÉĞÎ´½øÈëInteractRangeÊ±£¬ÏÈ½øÈë×·»÷Ì¬£»·ñÔòÖ±½Ó½øÈëÇ°Ò¡
+	
+	//ConstructionModeä¸‹ç¦ç”¨è¿½å‡»ï¼Œç›´æ¥è¿›å…¥å‰æ‘‡
+	if (InteractMgr && InteractMgr->GetCurrentInteractMode(InCharacter) == IM_Construction)
+	{
+		SwitchState(InCharacter, EPCS_PreInteract);
+		return;
+	}
+	
+	//æœ‰äº¤äº’ç›®æ ‡ä¸”å°šæœªè¿›å…¥InteractRangeæ—¶ï¼Œå…ˆè¿›å…¥è¿½å‡»æ€ï¼›å¦åˆ™ç›´æ¥è¿›å…¥å‰æ‘‡
 	if (IsValidTarget(Target))
 	{
 		const FVector Delta   = Target->GetActorLocation() - InCharacter->GetActorLocation();
@@ -492,9 +508,9 @@ void UHB_CharacterSubsystem::BeginInteractFlow(ACharacter* InCharacter)
 	SwitchState(InCharacter, EPCS_PreInteract);
 }
 
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
-// Tick Çı¶¯
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// Tick é©±åŠ¨
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 void UHB_CharacterSubsystem::TickCharacter(ACharacter* InCharacter, float DeltaTime)
 {
@@ -510,7 +526,7 @@ void UHB_CharacterSubsystem::TickCharacter(ACharacter* InCharacter, float DeltaT
 	}
 #endif
 #if !UE_SERVER
-	//·şÎñ¶Ë»úÆ÷£¨º¬Listen Server / ±à¼­Æ÷GameÄ£Ê½£©Ò²ĞèÒª±¾µØÊÓ¾õ
+	//æœåŠ¡ç«¯æœºå™¨ï¼ˆå«Listen Server / ç¼–è¾‘å™¨Gameæ¨¡å¼ï¼‰ä¹Ÿéœ€è¦æœ¬åœ°è§†è§‰
 	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
 	{
 		Tick_LocalCosmetic(InCharacter, DeltaTime);
@@ -526,7 +542,7 @@ void UHB_CharacterSubsystem::TickUpdateState(ACharacter* InCharacter, float Delt
 		return;
 	}
 	const EPlayerCharacterState State = Mgr->GetCurrentlyState(InCharacter);
-	//´¦ÓÚ½»»¥Á÷³ÌÖĞ£¨º¬×·»÷Ä¿±ê£©£ºÖ±½Ó±£³Öµ±Ç°×´Ì¬
+	//å¤„äºäº¤äº’æµç¨‹ä¸­ï¼ˆå«è¿½å‡»ç›®æ ‡ï¼‰ï¼šç›´æ¥ä¿æŒå½“å‰çŠ¶æ€
 	if (State == EPCS_MoveToTarget ||
 		State == EPCS_PreInteract  ||
 		State == EPCS_Interact     ||
@@ -567,7 +583,7 @@ void UHB_CharacterSubsystem::Tick_AuthorityState(ACharacter* InCharacter, float 
 		break;
 	case EPCS_MoveToTarget:
 	{
-		//·şÎñ¶ËÖ»×ö"µ½´ïÔòÇĞPreInteract / Ä¿±êÊ§Ğ§ÔòÖĞÖ¹"µÄ×´Ì¬ÍÆ½ø
+		//æœåŠ¡ç«¯åªåš"åˆ°è¾¾åˆ™åˆ‡PreInteract / ç›®æ ‡å¤±æ•ˆåˆ™ä¸­æ­¢"çš„çŠ¶æ€æ¨è¿›
 		TickAuthorityMoveToTarget(InCharacter, DeltaTime);
 		break;
 	}
@@ -610,8 +626,8 @@ void UHB_CharacterSubsystem::Tick_AuthorityState(ACharacter* InCharacter, float 
 #if !UE_SERVER
 void UHB_CharacterSubsystem::Tick_LocalCosmetic(ACharacter* InCharacter, float DeltaTime)
 {
-	//¿Í»§¶Ë±¾µØ£ºCurrentlyStateÓÉ·şÎñ¶ËReplicateÍ¬²½¹ıÀ´£¬Ö»¶ÁÊ¹ÓÃ£¬
-	//ÑÏ½ûµ÷ÓÃSwitchState¡¢ÑÏ½ûĞŞ¸ÄÈÎºÎReplicatedÊôĞÔ¡£
+	//å®¢æˆ·ç«¯æœ¬åœ°ï¼šCurrentlyStateç”±æœåŠ¡ç«¯ReplicateåŒæ­¥è¿‡æ¥ï¼Œåªè¯»ä½¿ç”¨ï¼Œ
+	//ä¸¥ç¦è°ƒç”¨SwitchStateã€ä¸¥ç¦ä¿®æ”¹ä»»ä½•Replicatedå±æ€§ã€‚
 	AHB_CharacterManager* Mgr = GetCharacterManager();
 	if (!Mgr)
 	{
@@ -628,7 +644,7 @@ void UHB_CharacterSubsystem::Tick_LocalCosmetic(ACharacter* InCharacter, float D
 		break;
 	case EPCS_MoveToTarget:
 	{
-		//¿Í»§¶ËÇı¶¯×·»÷Î»ÒÆ£º×ßCharacterMovement±ê×¼Ô¤²â¹ÜÏß
+		//å®¢æˆ·ç«¯é©±åŠ¨è¿½å‡»ä½ç§»ï¼šèµ°CharacterMovementæ ‡å‡†é¢„æµ‹ç®¡çº¿
 		TickMoveToTarget(InCharacter, DeltaTime);
 		break;
 	}
@@ -644,9 +660,9 @@ void UHB_CharacterSubsystem::Tick_LocalCosmetic(ACharacter* InCharacter, float D
 }
 #endif // !UE_SERVER
 
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
-// ×·»÷Ä¿±ê
-//¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª¡ª
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
+// è¿½å‡»ç›®æ ‡
+//â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 void UHB_CharacterSubsystem::TickAuthorityMoveToTarget(ACharacter* InCharacter, float DeltaTime)
 {
@@ -672,7 +688,7 @@ void UHB_CharacterSubsystem::TickAuthorityMoveToTarget(ACharacter* InCharacter, 
 
 void UHB_CharacterSubsystem::TickMoveToTarget(ACharacter* InCharacter, float DeltaTime)
 {
-	//½ö×ÔÖÎ´úÀí¿Í»§¶Ëµ÷ÓÃ£ºÖ»²úÉúAddMovementInput£¬×ßCharacterMovement±ê×¼Ô¤²â¹ÜÏß
+	//ä»…è‡ªæ²»ä»£ç†å®¢æˆ·ç«¯è°ƒç”¨ï¼šåªäº§ç”ŸAddMovementInputï¼Œèµ°CharacterMovementæ ‡å‡†é¢„æµ‹ç®¡çº¿
 	AHB_CharacterManager* Mgr = GetCharacterManager();
 	if (!Mgr)
 	{
@@ -685,7 +701,7 @@ void UHB_CharacterSubsystem::TickMoveToTarget(ACharacter* InCharacter, float Del
 		return;
 	}
 
-	//½ö×ÔÖÎ´úÀí£¨¼´±¾µØÍæ¼Ò¿ØÖÆµÄ½ÇÉ«£©²ÅÇı¶¯¿Í»§¶Ë×·»÷
+	//ä»…è‡ªæ²»ä»£ç†ï¼ˆå³æœ¬åœ°ç©å®¶æ§åˆ¶çš„è§’è‰²ï¼‰æ‰é©±åŠ¨å®¢æˆ·ç«¯è¿½å‡»
 	if (InCharacter->GetLocalRole() != ROLE_AutonomousProxy && InCharacter->GetLocalRole() != ROLE_Authority)
 	{
 		return;
@@ -702,13 +718,13 @@ void UHB_CharacterSubsystem::TickMoveToTarget(ACharacter* InCharacter, float Del
 	const FVector DeltaXY(Delta.X, Delta.Y, 0.f);
 	const float   DistXY = DeltaXY.Size();
 
-	//ÒÑÔÚ½»»¥·¶Î§ÄÚ£º¿Í»§¶Ë²»ÔÙÖ÷¶¯Çı¶¯Î»ÒÆ
+	//å·²åœ¨äº¤äº’èŒƒå›´å†…ï¼šå®¢æˆ·ç«¯ä¸å†ä¸»åŠ¨é©±åŠ¨ä½ç§»
 	if (DistXY <= Range)
 	{
 		return;
 	}
 
-	//°ÑÊÀ½ç¿Õ¼äÏÂ"³¯ÏòÄ¿±êµÄXYµ¥Î»ÏòÁ¿"·´ËãÎªÍæ¼ÒControlRotation¾Ö²¿¿Õ¼äµÄ(X=ÓÒ, Y=Ç°) 2DÊäÈë
+	//æŠŠä¸–ç•Œç©ºé—´ä¸‹"æœå‘ç›®æ ‡çš„XYå•ä½å‘é‡"åç®—ä¸ºç©å®¶ControlRotationå±€éƒ¨ç©ºé—´çš„(X=å³, Y=å‰) 2Dè¾“å…¥
 	const FVector DirXY = DeltaXY.GetSafeNormal();
 	FVector2D MoveInput2D(0.f, 1.f);
 	AController* Controller = InCharacter->GetController();
@@ -727,7 +743,7 @@ void UHB_CharacterSubsystem::TickMoveToTarget(ACharacter* InCharacter, float Del
 		MoveInput2D.Y = DirXY.X;
 	}
 
-	//ÉèÖÃÄÚ²¿Çı¶¯±ê¼ÇÒÔÈÆ¹ı×´Ì¬ÆÁ±Î
+	//è®¾ç½®å†…éƒ¨é©±åŠ¨æ ‡è®°ä»¥ç»•è¿‡çŠ¶æ€å±è”½
 	Mgr->SetInternalDrivenMove(InCharacter, true);
 	HBChar->Move(FInputActionValue(MoveInput2D));
 	Mgr->SetInternalDrivenMove(InCharacter, false);

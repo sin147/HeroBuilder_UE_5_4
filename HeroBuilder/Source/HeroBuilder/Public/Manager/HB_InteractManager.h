@@ -25,7 +25,7 @@ public:
 	TEnumAsByte<EInteractType> InteractType = IT_Normal;
 
 	UPROPERTY()
-	TEnumAsByte<EInteractManagerInteractMode> InteractMode = IMIM_Normal;
+	TEnumAsByte<EInteractMode> InteractMode = IM_Normal;
 };
 
 /**
@@ -47,8 +47,8 @@ public:
 	void SetCurrentInteractType(ACharacter* InCharacter, EInteractType NewType);
 
 	//—— 交互模式（建造/正常） ——
-	EInteractManagerInteractMode GetCurrentInteractMode(ACharacter* InCharacter) const;
-	void SetCurrentInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode NewMode);
+	EInteractMode GetCurrentInteractMode(ACharacter* InCharacter) const;
+	void SetCurrentInteractMode(ACharacter* InCharacter, EInteractMode NewMode);
 
 	//玩家登出时清理表项（仅服务端调用）
 	void RemoveEntry(ACharacter* InCharacter);

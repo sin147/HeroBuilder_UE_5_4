@@ -20,10 +20,10 @@ enum EInteractType :uint8
 //与角色交互模式（建造模式开关）保持一致的枚举
 //放在这里以便InteractData作为基础数据可直接使用，避免循环依赖
 UENUM(BlueprintType)
-enum EInteractManagerInteractMode :uint8
+enum EInteractMode :uint8
 {
-	IMIM_Normal UMETA(DisplayName = "正常"),
-	IMIM_Construction UMETA(DisplayName = "建筑模式"),
+	IM_Normal UMETA(DisplayName = "正常"),
+	IM_Construction UMETA(DisplayName = "建筑模式"),
 };
 
 USTRUCT(BlueprintType)
@@ -69,18 +69,18 @@ private:
 	//以 InteractMode 为 Key 的配置表；同一 Mode 下可挂多条 FInteractInfo（按 InteractType 区分）。
 	//Map 的 Key 集合由 RefreshInteractAnimations 在编辑器内按枚举自动补齐/裁剪。
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InteractData", meta = (AllowPrivateAccess = "true", ReadOnlyKeys), EditFixedSize)
-	TMap<TEnumAsByte<EInteractManagerInteractMode>, FInteractInfoArray> InteractAnimations;
+	TMap<TEnumAsByte<EInteractMode>, FInteractInfoArray> InteractAnimations;
 
 public:
 	//按 (Mode, Type) 查表获取该条配置的字段
 	UFUNCTION(BlueprintCallable, Category = "InteractData")
-	UAnimSequence* GetInteractAnimation(EInteractManagerInteractMode InteractMode, EInteractType InteractType);
+	UAnimSequence* GetInteractAnimation(EInteractMode InteractMode, EInteractType InteractType);
 	UFUNCTION(BlueprintCallable, Category = "InteractData")
-	float GetInteractDistance(EInteractManagerInteractMode InteractMode, EInteractType InteractType);
+	float GetInteractDistance(EInteractMode InteractMode, EInteractType InteractType);
 	UFUNCTION(BlueprintCallable, Category = "InteractData")
-	float GetPreInteractDelay(EInteractManagerInteractMode InteractMode, EInteractType InteractType);
+	float GetPreInteractDelay(EInteractMode InteractMode, EInteractType InteractType);
 	UFUNCTION(BlueprintCallable, Category = "InteractData")
-	float GetPostInteractDelay(EInteractManagerInteractMode InteractMode, EInteractType InteractType);
+	float GetPostInteractDelay(EInteractMode InteractMode, EInteractType InteractType);
 
 #if WITH_EDITOR
 protected:
@@ -96,5 +96,5 @@ private:
 
 private:
 	//查表辅助：在 Mode 数组中按 Type 查找；找不到返回 nullptr
-	const FInteractInfo* FindInfoByType(EInteractManagerInteractMode InteractMode, EInteractType InteractType) const;
+	const FInteractInfo* FindInfoByType(EInteractMode InteractMode, EInteractType InteractType) const;
 };

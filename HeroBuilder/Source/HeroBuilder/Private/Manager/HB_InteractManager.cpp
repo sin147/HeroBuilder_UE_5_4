@@ -55,13 +55,14 @@ void AHB_InteractManager::SetCurrentInteractType(ACharacter* InCharacter, EInter
 	NewEntry.Character = InCharacter;
 	NewEntry.InteractType = NewType;
 	CharacterInteractArray.Add(NewEntry);
+
 }
 
-EInteractManagerInteractMode AHB_InteractManager::GetCurrentInteractMode(ACharacter* InCharacter) const
+EInteractMode AHB_InteractManager::GetCurrentInteractMode(ACharacter* InCharacter) const
 {
 	if (!IsValid(InCharacter))
 	{
-		return IMIM_Normal;
+		return IM_Normal;
 	}
 	for (const FInteractEntry& Entry : CharacterInteractArray)
 	{
@@ -70,10 +71,10 @@ EInteractManagerInteractMode AHB_InteractManager::GetCurrentInteractMode(ACharac
 			return Entry.InteractMode;
 		}
 	}
-	return IMIM_Normal;
+	return IM_Normal;
 }
 
-void AHB_InteractManager::SetCurrentInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode NewMode)
+void AHB_InteractManager::SetCurrentInteractMode(ACharacter* InCharacter, EInteractMode NewMode)
 {
 	if (!IsValid(InCharacter))
 	{

@@ -283,8 +283,8 @@ void AHeroBuilderCharacter::ChangeConstructionMode(const FInputActionValue& Valu
 	{
 		return;
 	}
-	const EInteractManagerInteractMode Cur = InteractSys->GetInteractMode(this);
-	const EInteractManagerInteractMode Next = (Cur == IMIM_Construction) ? IMIM_Normal : IMIM_Construction;
+	const EInteractMode Cur = InteractSys->GetInteractMode(this);
+	const EInteractMode Next = (Cur == IM_Construction) ? IM_Normal : IM_Construction;
 	if (HasAuthority())
 	{
 		InteractSys->SwitchInteractMode(this, Next);
@@ -360,7 +360,7 @@ void AHeroBuilderCharacter::Server_SwitchInteractMode_Implementation(uint8 NewMo
 {
 	if (UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>())
 	{
-		InteractSys->SwitchInteractMode(this, static_cast<EInteractManagerInteractMode>(NewMode));
+		InteractSys->SwitchInteractMode(this, static_cast<EInteractMode>(NewMode));
 	}
 }
 

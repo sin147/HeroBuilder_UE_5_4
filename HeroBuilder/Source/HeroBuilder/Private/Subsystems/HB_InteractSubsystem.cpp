@@ -270,7 +270,7 @@ void UHB_InteractSubsystem::EnterInteractType(ACharacter* InCharacter, EInteract
 	}
 	if (InteractData)
 	{
-		const EInteractManagerInteractMode CurMode = GetInteractMode(HeroBuilderCharacter);
+		const EInteractMode CurMode = GetInteractMode(HeroBuilderCharacter);
 		HeroBuilderCharacter->SetPreInteractDelay(InteractData->GetPreInteractDelay(CurMode, EnterMode));
 		HeroBuilderCharacter->SetPostInteractDelay(InteractData->GetPostInteractDelay(CurMode, EnterMode));
 	}
@@ -337,20 +337,20 @@ EInteractType UHB_InteractSubsystem::GetInteractType(ACharacter* InCharacter) co
 	return IT_None;
 }
 
-EInteractManagerInteractMode UHB_InteractSubsystem::GetInteractMode(ACharacter* InCharacter) const
+EInteractMode UHB_InteractSubsystem::GetInteractMode(ACharacter* InCharacter) const
 {
 	if (!IsValid(InCharacter))
 	{
-		return IMIM_Normal;
+		return IM_Normal;
 	}
 	if (AHB_InteractManager* InteractMgr = GetInteractManager())
 	{
 		return InteractMgr->GetCurrentInteractMode(InCharacter);
 	}
-	return IMIM_Normal;
+	return IM_Normal;
 }
 
-void UHB_InteractSubsystem::SetCurrentInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode NewMode)
+void UHB_InteractSubsystem::SetCurrentInteractMode(ACharacter* InCharacter, EInteractMode NewMode)
 {
 	if (!IsValid(InCharacter))
 	{
@@ -362,7 +362,7 @@ void UHB_InteractSubsystem::SetCurrentInteractMode(ACharacter* InCharacter, EInt
 	}
 }
 
-void UHB_InteractSubsystem::SwitchInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode NewMode)
+void UHB_InteractSubsystem::SwitchInteractMode(ACharacter* InCharacter, EInteractMode NewMode)
 {
 	if (!IsValid(InCharacter))
 	{
@@ -378,7 +378,7 @@ void UHB_InteractSubsystem::SwitchInteractMode(ACharacter* InCharacter, EInterac
 	{
 		return;
 	}
-	const EInteractManagerInteractMode CurrentMode = InteractMgr->GetCurrentInteractMode(HBCharacter);
+	const EInteractMode CurrentMode = InteractMgr->GetCurrentInteractMode(HBCharacter);
 	if (CurrentMode == NewMode)
 	{
 		return;
@@ -392,7 +392,7 @@ void UHB_InteractSubsystem::SwitchInteractMode(ACharacter* InCharacter, EInterac
 	EnterInteractMode(InCharacter, NewMode);
 }
 
-void UHB_InteractSubsystem::EnterInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode EnterMode)
+void UHB_InteractSubsystem::EnterInteractMode(ACharacter* InCharacter, EInteractMode EnterMode)
 {
 	if (!IsValid(InCharacter))
 	{
@@ -405,9 +405,9 @@ void UHB_InteractSubsystem::EnterInteractMode(ACharacter* InCharacter, EInteract
 	}
 	switch (EnterMode)
 	{
-	case IMIM_Normal:
+	case IM_Normal:
 		break;
-	case IMIM_Construction:
+	case IM_Construction:
 		if (UHB_ConstructionSubsystem* ConstructionSys = GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>())
 		{
 			ConstructionSys->Server_ActiveConstructionMode(HBCharacter);
@@ -420,11 +420,11 @@ void UHB_InteractSubsystem::EnterInteractMode(ACharacter* InCharacter, EInteract
 	{
 		InteractMgr->SetCurrentInteractMode(HBCharacter, EnterMode);
 	}
-	const FString ModeName = StaticEnum<EInteractManagerInteractMode>()->GetNameStringByValue((int64)EnterMode);
+	const FString ModeName = StaticEnum<EInteractMode>()->GetNameStringByValue((int64)EnterMode);
 	UE_LOG(LogInteractSubsystem, Log, TEXT("'%s' Enter InteractMode '%s'!"), *GetNameSafe(InCharacter), *ModeName);
 }
 
-void UHB_InteractSubsystem::LeaveInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode LeaveMode)
+void UHB_InteractSubsystem::LeaveInteractMode(ACharacter* InCharacter, EInteractMode LeaveMode)
 {
 	if (!IsValid(InCharacter))
 	{
@@ -437,9 +437,9 @@ void UHB_InteractSubsystem::LeaveInteractMode(ACharacter* InCharacter, EInteract
 	}
 	switch (LeaveMode)
 	{
-	case IMIM_Normal:
+	case IM_Normal:
 		break;
-	case IMIM_Construction:
+	case IM_Construction:
 		if (UHB_ConstructionSubsystem* ConstructionSys = GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>())
 		{
 			ConstructionSys->Server_CancelConstructionMode(HBCharacter);
@@ -450,9 +450,9 @@ void UHB_InteractSubsystem::LeaveInteractMode(ACharacter* InCharacter, EInteract
 	}
 	if (AHB_InteractManager* InteractMgr = GetInteractManager())
 	{
-		InteractMgr->SetCurrentInteractMode(HBCharacter, IMIM_Normal);
+		InteractMgr->SetCurrentInteractMode(HBCharacter, IM_Normal);
 	}
-	const FString ModeName = StaticEnum<EInteractManagerInteractMode>()->GetNameStringByValue((int64)LeaveMode);
+	const FString ModeName = StaticEnum<EInteractMode>()->GetNameStringByValue((int64)LeaveMode);
 	UE_LOG(LogInteractSubsystem, Log, TEXT("'%s' Leave InteractMode '%s'!"), *GetNameSafe(InCharacter), *ModeName);
 }
 
@@ -503,10 +503,10 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 			DamageSys->TakeDamage(InCharacter, Damage, Target);
 		}
 	};
-	const EInteractManagerInteractMode Mode = GetInteractMode(InCharacter);
+	const EInteractMode Mode = GetInteractMode(InCharacter);
 	switch (Mode)
 	{
-	case IMIM_Normal:
+	case IM_Normal:
 	{
 		switch (InteractType)
 		{
@@ -528,7 +528,7 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 		}
 		break;
 	}
-	case IMIM_Construction:
+	case IM_Construction:
 	{
 		if (UHB_ConstructionSubsystem* ConstructionSys = GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>())
 		{
@@ -543,7 +543,7 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 
 }
 
-UAnimSequence* UHB_InteractSubsystem::GetInteractAnim(EInteractManagerInteractMode InteractMode, EInteractType InteractType) const
+UAnimSequence* UHB_InteractSubsystem::GetInteractAnim(EInteractMode InteractMode, EInteractType InteractType) const
 {
 	if (!InteractData)
 	{

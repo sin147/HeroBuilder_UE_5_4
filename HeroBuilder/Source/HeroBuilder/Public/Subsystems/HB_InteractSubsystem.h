@@ -55,15 +55,15 @@ public:
 	EInteractType GetInteractType(ACharacter* InCharacter) const;
 	//获取玩家当前的交互模式（建造/正常）
     UFUNCTION(BlueprintCallable)
-	EInteractManagerInteractMode GetInteractMode(ACharacter* InCharacter) const;
+	EInteractMode GetInteractMode(ACharacter* InCharacter) const;
 	//设置玩家当前的交互模式（建造/正常）—— 纯Setter：仅写表，无副作用
-	void SetCurrentInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode NewMode);
+	void SetCurrentInteractMode(ACharacter* InCharacter, EInteractMode NewMode);
 	//切换玩家交互模式（建造/正常）：负责 Leave + Enter 一条龙
-	void SwitchInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode NewMode);
+	void SwitchInteractMode(ACharacter* InCharacter, EInteractMode NewMode);
 	//进入交互模式（建造/正常）
-	void EnterInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode EnterMode);
+	void EnterInteractMode(ACharacter* InCharacter, EInteractMode EnterMode);
 	//离开交互模式（建造/正常）
-	void LeaveInteractMode(ACharacter* InCharacter, EInteractManagerInteractMode LeaveMode);
+	void LeaveInteractMode(ACharacter* InCharacter, EInteractMode LeaveMode);
 	//准备交互（在角色进入交互模式时调用）
 	void PreInteract(ACharacter* InCharacter);
 	//Post交互（在角色离开交互模式时调用）
@@ -73,5 +73,5 @@ public:
 	void TryInteract(ACharacter* InCharacter);
 	//获取交互动画
 	UFUNCTION(BlueprintCallable)
-	UAnimSequence* GetInteractAnim(EInteractManagerInteractMode InteractMode, EInteractType InteractType) const;
+	UAnimSequence* GetInteractAnim(EInteractMode InteractMode, EInteractType InteractType) const;
 };

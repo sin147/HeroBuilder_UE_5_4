@@ -4,7 +4,7 @@
 #include "UObject/Class.h"
 #include "UObject/UnrealType.h"
 
-const FInteractInfo* UInteractData::FindInfoByType(EInteractManagerInteractMode InteractMode, EInteractType InteractType) const
+const FInteractInfo* UInteractData::FindInfoByType(EInteractMode InteractMode, EInteractType InteractType) const
 {
 	if (const FInteractInfoArray* Arr = InteractAnimations.Find(InteractMode))
 	{
@@ -19,7 +19,7 @@ const FInteractInfo* UInteractData::FindInfoByType(EInteractManagerInteractMode 
 	return nullptr;
 }
 
-UAnimSequence* UInteractData::GetInteractAnimation(EInteractManagerInteractMode InteractMode, EInteractType InteractType)
+UAnimSequence* UInteractData::GetInteractAnimation(EInteractMode InteractMode, EInteractType InteractType)
 {
 	if (const FInteractInfo* Info = FindInfoByType(InteractMode, InteractType))
 	{
@@ -28,7 +28,7 @@ UAnimSequence* UInteractData::GetInteractAnimation(EInteractManagerInteractMode 
 	return nullptr;
 }
 
-float UInteractData::GetInteractDistance(EInteractManagerInteractMode InteractMode, EInteractType InteractType)
+float UInteractData::GetInteractDistance(EInteractMode InteractMode, EInteractType InteractType)
 {
 	if (const FInteractInfo* Info = FindInfoByType(InteractMode, InteractType))
 	{
@@ -37,7 +37,7 @@ float UInteractData::GetInteractDistance(EInteractManagerInteractMode InteractMo
 	return 0.0f;
 }
 
-float UInteractData::GetPreInteractDelay(EInteractManagerInteractMode InteractMode, EInteractType InteractType)
+float UInteractData::GetPreInteractDelay(EInteractMode InteractMode, EInteractType InteractType)
 {
 	if (const FInteractInfo* Info = FindInfoByType(InteractMode, InteractType))
 	{
@@ -46,7 +46,7 @@ float UInteractData::GetPreInteractDelay(EInteractManagerInteractMode InteractMo
 	return 9999.0f;
 }
 
-float UInteractData::GetPostInteractDelay(EInteractManagerInteractMode InteractMode, EInteractType InteractType)
+float UInteractData::GetPostInteractDelay(EInteractMode InteractMode, EInteractType InteractType)
 {
 	if (const FInteractInfo* Info = FindInfoByType(InteractMode, InteractType))
 	{
@@ -75,7 +75,7 @@ void UInteractData::PostLoad()
 
 void UInteractData::RefreshInteractAnimations()
 {
-	const UEnum* InteractModeEnum = StaticEnum<EInteractManagerInteractMode>();
+	const UEnum* InteractModeEnum = StaticEnum<EInteractMode>();
 	const UEnum* InteractTypeEnum = StaticEnum<EInteractType>();
 	if (!InteractModeEnum || !InteractTypeEnum)
 	{
@@ -83,13 +83,13 @@ void UInteractData::RefreshInteractAnimations()
 	}
 
 	// 收集所有合法的 Mode 枚举值（排除最后一项自动生成的_MAX）
-	TSet<EInteractManagerInteractMode> AllInteractModes;
+	TSet<EInteractMode> AllInteractModes;
 	{
 		const int32 NumEnums = InteractModeEnum->NumEnums() - 1;
 		for (int32 i = 0; i < NumEnums; ++i)
 		{
 			const int64 EnumValue = InteractModeEnum->GetValueByIndex(i);
-			AllInteractModes.Add(static_cast<EInteractManagerInteractMode>(EnumValue));
+			AllInteractModes.Add(static_cast<EInteractMode>(EnumValue));
 		}
 	}
 
@@ -112,7 +112,7 @@ void UInteractData::RefreshInteractAnimations()
 	// 主动剔除无效 Mode Key
 	for (auto It = InteractAnimations.CreateIterator(); It; ++It)
 	{
-		const EInteractManagerInteractMode KeyMode = static_cast<EInteractManagerInteractMode>(It.Key().GetValue());
+		const EInteractMode KeyMode = static_cast<EInteractMode>(It.Key().GetValue());
 		if (!AllInteractModes.Contains(KeyMode))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("InteractData: 剔除非法Mode Key %d"), static_cast<int32>(KeyMode));
@@ -122,7 +122,7 @@ void UInteractData::RefreshInteractAnimations()
 	}
 
 	// 添加缺失的 Mode Key
-	for (const EInteractManagerInteractMode& Mode : AllInteractModes)
+	for (const EInteractMode& Mode : AllInteractModes)
 	{
 		if (!InteractAnimations.Contains(Mode))
 		{
