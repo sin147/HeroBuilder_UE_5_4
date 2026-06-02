@@ -59,6 +59,8 @@ public:
 	void SetInteractRange(ACharacter* InCharacter, float NewRange);
 	void SetPreInteractDelay(ACharacter* InCharacter, float Delay);
 	void SetPostInteractDelay(ACharacter* InCharacter, float Delay);
+	UFUNCTION(BlueprintPure, Category = "Character|Interact")
+	float GetCurrentInteractDelay(ACharacter* InCharacter) const;
 
 	//—— 客户端追击：供Move()内部判断"是否系统驱动" ——
 	bool IsInternalDrivenMove(ACharacter* InCharacter) const;

@@ -84,7 +84,6 @@ void AHB_CharacterManager::RemoveEntry(ACharacter* InCharacter)
 	{
 		return Entry.Character == InCharacter;
 	});
-	CurrentInteractDelayMap.Remove(InCharacter);
 	InternalDrivenMoveMap.Remove(InCharacter);
 }
 
@@ -200,13 +199,9 @@ void AHB_CharacterManager::SetInteractRange(ACharacter* InCharacter, float NewRa
 //—— 非同步运行期数据 ——
 float AHB_CharacterManager::GetCurrentInteractDelay(ACharacter* InCharacter) const
 {
-	if (!IsValid(InCharacter))
+	if (const FCharacterStateEntry* Entry = FindEntry(InCharacter))
 	{
-		return 0.f;
-	}
-	if (const float* Found = CurrentInteractDelayMap.Find(InCharacter))
-	{
-		return *Found;
+		return Entry->CurrentInteractDelay;
 	}
 	return 0.f;
 }
@@ -217,7 +212,7 @@ void AHB_CharacterManager::SetCurrentInteractDelay(ACharacter* InCharacter, floa
 	{
 		return;
 	}
-	CurrentInteractDelayMap.Add(InCharacter, NewDelay);
+	FindOrAddEntry(InCharacter).CurrentInteractDelay = NewDelay;
 }
 
 bool AHB_CharacterManager::GetInternalDrivenMove(ACharacter* InCharacter) const

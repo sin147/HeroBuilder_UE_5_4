@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+ï»¿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -9,58 +9,59 @@
 class ACharacter;
 class AActor;
 
-//Íæ¼Ò½ÇÉ«×´Ì¬Ã¶¾Ù£¨´ÓHeroBuilderCharacterÇ¨ÒÆÖÁ´Ë£¬±ãÓÚManager/Subsystem·ÃÎÊ£©
+//ç©å®¶è§’è‰²çŠ¶æ€æšä¸¾ï¼ˆä»HeroBuilderCharacterè¿ç§»è‡³æ­¤ï¼Œä¾¿äºManager/Subsystemè®¿é—®ï¼‰
 UENUM(BlueprintType)
 enum EPlayerCharacterState :uint8
 {
-	EPCS_None UMETA(DisplayName = "ÎŞ"),
-	EPCS_Idle UMETA(DisplayName = "¿ÕÏĞ"),
-	EPCS_Move UMETA(DisplayName = "ÒÆ¶¯"),
-	EPCS_MoveToTarget UMETA(DisplayName = "×·»÷Ä¿±ê"),
-	EPCS_PreInteract UMETA(DisplayName = "½»»¥Ç°Ò¡"),
-	EPCS_Interact UMETA(DisplayName = "½»»¥"),
-	EPCS_PostInteract UMETA(DisplayName = "½»»¥ºóÒ¡"),
+	EPCS_None UMETA(DisplayName = "æ— "),
+	EPCS_Idle UMETA(DisplayName = "ç©ºé—²"),
+	EPCS_Move UMETA(DisplayName = "ç§»åŠ¨"),
+	EPCS_MoveToTarget UMETA(DisplayName = "è¿½å‡»ç›®æ ‡"),
+	EPCS_PreInteract UMETA(DisplayName = "äº¤äº’å‰æ‘‡"),
+	EPCS_Interact UMETA(DisplayName = "äº¤äº’"),
+	EPCS_PostInteract UMETA(DisplayName = "äº¤äº’åæ‘‡"),
 };
 
-//µ¥ÌõÍæ¼Ò½ÇÉ«×´Ì¬Êı¾İ£¨²ÎÓëReplicate£©
+//å•æ¡ç©å®¶è§’è‰²çŠ¶æ€æ•°æ®ï¼ˆå‚ä¸Replicateï¼‰
 USTRUCT()
 struct FCharacterStateEntry
 {
 	GENERATED_BODY()
 public:
-	//ËùÊô½ÇÉ«£¨×÷Îª¸ÃÌõ¼ÇÂ¼µÄKey£©
+	//æ‰€å±è§’è‰²ï¼ˆä½œä¸ºè¯¥æ¡è®°å½•çš„Keyï¼‰
 	UPROPERTY()
 	TObjectPtr<ACharacter> Character = nullptr;
 
-	//µ±Ç°×´Ì¬
+	//å½“å‰çŠ¶æ€
 	UPROPERTY()
 	TEnumAsByte<EPlayerCharacterState> CurrentlyState = EPCS_Idle;
 
-	//µ±Ç°½»»¥Ä¿±ê
+	//å½“å‰äº¤äº’ç›®æ ‡
 	UPROPERTY()
 	TObjectPtr<AActor> InteractTarget = nullptr;
 
-	//½»»¥Ç°Ò¡Ê±¼ä
+	//äº¤äº’å‰æ‘‡æ—¶é—´
 	UPROPERTY()
 	float PreInteractDelay = 0.3f;
 
-	//½»»¥ºóÒ¡Ê±¼ä
+	//äº¤äº’åæ‘‡æ—¶é—´
 	UPROPERTY()
 	float PostInteractDelay = 0.3f;
 
-	//¹¥»÷Á¦
+	//æ”»å‡»åŠ›
 	UPROPERTY()
 	float Attack = 10.f;
 
-	//½»»¥/¹¥»÷·¶Î§
+	//äº¤äº’/æ”»å‡»èŒƒå›´
 	UPROPERTY()
 	float InteractRange = 100.f;
+
 };
 
 /**
- * ½ÇÉ«¹ÜÀíÆ÷£¨µ¥Àı£©
- * ·şÎñ¶ËÈ¨Íş£ºÒÔ Character Îª Key Î¬»¤ËùÓĞÍæ¼ÒµÄ½ÇÉ«×´Ì¬Êı¾İ£»ÕûÕÅ±í¸´ÖÆ¸øËùÓĞ¿Í»§¶Ë¡£
- * ½ö³Ğµ£"Êı¾İÎ¬»¤ + ±éÀú"Ö°Ôğ£¬Âß¼­ÓÉ UHB_CharacterSubsystem ¸ºÔğ¡£
+ * è§’è‰²ç®¡ç†å™¨ï¼ˆå•ä¾‹ï¼‰
+ * æœåŠ¡ç«¯æƒå¨ï¼šä»¥ Character ä¸º Key ç»´æŠ¤æ‰€æœ‰ç©å®¶çš„è§’è‰²çŠ¶æ€æ•°æ®ï¼›æ•´å¼ è¡¨å¤åˆ¶ç»™æ‰€æœ‰å®¢æˆ·ç«¯ã€‚
+ * ä»…æ‰¿æ‹…"æ•°æ®ç»´æŠ¤ + éå†"èŒè´£ï¼Œé€»è¾‘ç”± UHB_CharacterSubsystem è´Ÿè´£ã€‚
  */
 UCLASS()
 class HEROBUILDER_API AHB_CharacterManager : public AHB_Base_Manager
@@ -72,11 +73,11 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	//¡ª¡ª ±íÏî×¢²á/ÒÆ³ı ¡ª¡ª
+	//â€”â€” è¡¨é¡¹æ³¨å†Œ/ç§»é™¤ â€”â€”
 	void RegisterCharacter(ACharacter* InCharacter);
 	void RemoveEntry(ACharacter* InCharacter);
 
-	//¡ª¡ª Í¬²½ÊôĞÔ·ÃÎÊ£¨Replicated£© ¡ª¡ª
+	//â€”â€” åŒæ­¥å±æ€§è®¿é—®ï¼ˆReplicatedï¼‰ â€”â€”
 	EPlayerCharacterState GetCurrentlyState(ACharacter* InCharacter) const;
 	void SetCurrentlyState(ACharacter* InCharacter, EPlayerCharacterState NewState);
 
@@ -95,28 +96,26 @@ public:
 	float GetInteractRange(ACharacter* InCharacter) const;
 	void SetInteractRange(ACharacter* InCharacter, float NewRange);
 
-	//¡ª¡ª ·ÇÍ¬²½ÔËĞĞÆÚÊı¾İ£¨½ö·şÎñ¶Ë/¿Í»§¶Ë±¾µØÊ¹ÓÃ£© ¡ª¡ª
+	//â€”â€” éåŒæ­¥è¿è¡ŒæœŸæ•°æ®ï¼ˆä»…æœåŠ¡ç«¯/å®¢æˆ·ç«¯æœ¬åœ°ä½¿ç”¨ï¼‰ â€”â€”
 	float GetCurrentInteractDelay(ACharacter* InCharacter) const;
 	void SetCurrentInteractDelay(ACharacter* InCharacter, float NewDelay);
 
 	bool GetInternalDrivenMove(ACharacter* InCharacter) const;
 	void SetInternalDrivenMove(ACharacter* InCharacter, bool bDriven);
 
-	//¡ª¡ª ±éÀú ¡ª¡ª
+	//â€”â€” éå† â€”â€”
 	const TArray<FCharacterStateEntry>& GetAllEntries() const { return CharacterStateArray; }
 
 private:
-	//È«Íæ¼Ò½ÇÉ«×´Ì¬±í£¨ÕûÕÅÊı×é¸´ÖÆ¸øËùÓĞ¿Í»§¶Ë£»UPROPERTY²»Ö§³Ö¸´ÖÆTMap£¬¹ÊÓÃTArray£©
+	//å…¨ç©å®¶è§’è‰²çŠ¶æ€è¡¨ï¼ˆæ•´å¼ æ•°ç»„å¤åˆ¶ç»™æ‰€æœ‰å®¢æˆ·ç«¯ï¼›UPROPERTYä¸æ”¯æŒå¤åˆ¶TMapï¼Œæ•…ç”¨TArrayï¼‰
 	UPROPERTY(Replicated)
 	TArray<FCharacterStateEntry> CharacterStateArray;
 
-	//¡ª¡ª ·ÇÍ¬²½µÄÃ¿½ÇÉ«ÔËĞĞÆÚÊı¾İ ¡ª¡ª
-	//½»»¥Ç°/ºóÒ¡µ¹¼ÆÊ±£¨½ö·şÎñ¶ËÊ¹ÓÃ£©
-	TMap<TWeakObjectPtr<ACharacter>, float> CurrentInteractDelayMap;
-	//ÄÚ²¿×·»÷Çı¶¯±ê¼Ç£¨½ö×ÔÖÎ´úÀí¿Í»§¶ËÊ¹ÓÃ£©
+	//â€”â€” éåŒæ­¥çš„æ¯è§’è‰²è¿è¡ŒæœŸæ•°æ® â€”â€”
+	//å†…éƒ¨è¿½å‡»é©±åŠ¨æ ‡è®°ï¼ˆä»…è‡ªæ²»ä»£ç†å®¢æˆ·ç«¯ä½¿ç”¨ï¼‰
 	TMap<TWeakObjectPtr<ACharacter>, bool> InternalDrivenMoveMap;
 
-	//²é±í¸¨Öú
+	//æŸ¥è¡¨è¾…åŠ©
 	const FCharacterStateEntry* FindEntry(ACharacter* InCharacter) const;
 	FCharacterStateEntry* FindEntryMutable(ACharacter* InCharacter);
 	FCharacterStateEntry& FindOrAddEntry(ACharacter* InCharacter);
