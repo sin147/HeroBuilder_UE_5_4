@@ -68,7 +68,6 @@ void UHB_CharacterSubsystem::OnPlayerLogin(AGameModeBase* GameMode, APlayerContr
 {
 	Super::OnPlayerLogin(GameMode, PlayerController);
 	//首个玩家登录时按需Spawn单例 CharacterManager
-	GetCharacterManager();
 }
 
 void UHB_CharacterSubsystem::OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting)
@@ -89,43 +88,9 @@ void UHB_CharacterSubsystem::OnPlayerLogout(AGameModeBase* GameMode, AController
 // Manager 访问
 //——————————————————————————————————————————————
 
-AHB_CharacterManager* UHB_CharacterSubsystem::GetCharacterManager() const
+AHB_CharacterManager* UHB_CharacterSubsystem::GetCharacterManager()
 {
-	if (IsValid(CachedCharacterManager))
-	{
-		return CachedCharacterManager;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return nullptr;
-	}
-
-	for (TActorIterator<AHB_CharacterManager> It(World); It; ++It)
-	{
-		AHB_CharacterManager* Mgr = *It;
-		if (IsValid(Mgr))
-		{
-			CachedCharacterManager = Mgr;
-			return Mgr;
-		}
-	}
-
-	//仅服务端有权限Spawn
-	if (NetMode != ENetMode::NM_Client)
-	{
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		AHB_CharacterManager* NewMgr = World->SpawnActor<AHB_CharacterManager>(AHB_CharacterManager::StaticClass(), SpawnParams);
-		if (NewMgr)
-		{
-			CachedCharacterManager = NewMgr;
-			return NewMgr;
-		}
-		UE_LOG(LogCharacterSubsystem, Error, TEXT("Failed to spawn singleton AHB_CharacterManager"));
-	}
-	return nullptr;
+	return GetManager<AHB_CharacterManager>();
 }
 
 //——————————————————————————————————————————————
@@ -256,20 +221,6 @@ bool UHB_CharacterSubsystem::IsInternalDrivenMove(ACharacter* InCharacter) const
 	return false;
 }
 
-bool UHB_CharacterSubsystem::IsValidTarget(AActor* Target) const
-{
-	if (!IsValid(Target))
-	{
-		return false;
-	}
-	UHB_DamageComponent* DamageComp = Target->FindComponentByClass<UHB_DamageComponent>();
-	if (!DamageComp)
-	{
-		return false;
-	}
-	return !DamageComp->IsDead();
-}
-
 //——————————————————————————————————————————————
 // 状态机：SwitchState / OnEnter / OnLeave / CanSwitch
 //——————————————————————————————————————————————
@@ -304,36 +255,71 @@ void UHB_CharacterSubsystem::SwitchState(ACharacter* InCharacter, EPlayerCharact
 
 bool UHB_CharacterSubsystem::CanSwitchState(ACharacter* InCharacter, EPlayerCharacterState NewState, EPlayerCharacterState OldState)
 {
-	switch (NewState)
+	//获取玩家当前交互模式
+    const EInteractMode InteractMode = GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetInteractMode(InCharacter);
+	switch (InteractMode)
 	{
-	case EPCS_None:
-		break;
-	case EPCS_Idle:
-		break;
-	case EPCS_Move:
-		break;
-	case EPCS_MoveToTarget:
-		break;
-	case EPCS_PreInteract:
+	case IM_Normal:
 	{
-		UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>();
-		if (InteractSys && InteractSys->GetInteractType(InCharacter) == IT_Construction)
+		switch (NewState)
 		{
-			if (!GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->CheckCanConstruction(InCharacter))
-			{
-				SwitchState(InCharacter, EPCS_Idle);
-				return false;
-			}
-			return true;
+		case EPCS_None:
+			break;
+		case EPCS_Idle:
+			break;
+		case EPCS_Move:
+			break;
+		case EPCS_MoveToTarget:
+			break;
+		case EPCS_PreInteract:
+			break;
+		case EPCS_Interact:
+			break;
+		case EPCS_PostInteract:
+			break;
+		default:
+			break;
 		}
+		break;
 	}
-	case EPCS_Interact:
+	case IM_Construction:
+	{
+		switch (NewState)
+		{
+		case EPCS_None:
+			break;
+		case EPCS_Idle:
+			break;
+		case EPCS_Move:
+			break;
+		case EPCS_MoveToTarget:
+			break;
+		case EPCS_PreInteract:
+		{
+			UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>();
+			if (InteractSys && InteractSys->GetInteractType(InCharacter) == IT_Construction)
+			{
+				if (!GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->CheckCanConstruction(InCharacter))
+				{
+					SwitchState(InCharacter, EPCS_Idle);
+					return false;
+				}
+				return true;
+			}
+		}
+		case EPCS_Interact:
+			break;
+		case EPCS_PostInteract:
+			break;
+		default:
+			break;
+		}
 		break;
-	case EPCS_PostInteract:
-		break;
+	}
 	default:
 		break;
 	}
+	
 	return true;
 }
 
@@ -495,7 +481,7 @@ void UHB_CharacterSubsystem::BeginInteractFlow(ACharacter* InCharacter)
 	}
 	
 	//有交互目标且尚未进入InteractRange时，先进入追击态；否则直接进入前摇
-	if (IsValidTarget(Target))
+	if (IsValid(Target))
 	{
 		const FVector Delta   = Target->GetActorLocation() - InCharacter->GetActorLocation();
 		const FVector DeltaXY(Delta.X, Delta.Y, 0.f);
@@ -673,7 +659,7 @@ void UHB_CharacterSubsystem::TickAuthorityMoveToTarget(ACharacter* InCharacter, 
 	}
 	AActor* Target = Mgr->GetInteractTarget(InCharacter);
 	const float Range = Mgr->GetInteractRange(InCharacter);
-	if (!IsValidTarget(Target))
+	if (!IsValid(Target))
 	{
 		AbortInteract(InCharacter);
 		return;
@@ -696,7 +682,7 @@ void UHB_CharacterSubsystem::TickMoveToTarget(ACharacter* InCharacter, float Del
 	}
 	AActor* Target = Mgr->GetInteractTarget(InCharacter);
 	const float Range = Mgr->GetInteractRange(InCharacter);
-	if (!IsValidTarget(Target))
+	if (!IsValid(Target))
 	{
 		return;
 	}

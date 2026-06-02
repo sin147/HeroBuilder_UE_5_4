@@ -101,6 +101,29 @@ void UHB_DamageComponent::Heal(float HealAmount)
 	}
 }
 
+void UHB_DamageComponent::Revive(float NewHealth)
+{
+	AActor* Owner = GetOwner();
+	if (!Owner || !Owner->HasAuthority())
+	{
+		return;
+	}
+
+	const float OldHealth = CurrentHealth;
+	const float ClampedHealth = FMath::Clamp(NewHealth, 0.f, MaxHealth);
+	CurrentHealth = ClampedHealth;
+	bIsDead = false;
+	LastAttacker = nullptr;
+
+	UE_LOG(LogDamageComponent, Log, TEXT("%s revived, health: %.1f -> %.1f"),
+		*Owner->GetName(), OldHealth, CurrentHealth);
+
+	if (!FMath::IsNearlyEqual(OldHealth, CurrentHealth))
+	{
+		OnHealthChanged.Broadcast(OldHealth, CurrentHealth, MaxHealth, nullptr);
+	}
+}
+
 void UHB_DamageComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);

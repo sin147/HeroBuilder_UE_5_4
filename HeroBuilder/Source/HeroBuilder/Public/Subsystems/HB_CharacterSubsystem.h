@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+ï»¿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -14,9 +14,9 @@ class AHeroBuilderCharacter;
 DECLARE_LOG_CATEGORY_EXTERN(LogCharacterSubsystem, Log, All);
 
 /**
- * ½ÇÉ«×ÓÏµÍ³
- * ¸ºÔğËùÓĞÍæ¼Ò½ÇÉ«µÄ×´Ì¬»úÂß¼­£¨SwitchState / OnEnter / OnLeave / Tick ÍÆ½ø / ×·»÷Óë½»»¥Á÷³Ì£©
- * Êı¾İÓÉ AHB_CharacterManager Î¬»¤£¬ÕûÕÅ±í·şÎñ¶ËÈ¨Íş+Replicate£»±¾Subsystem½ö³Ğµ£Âß¼­¡£
+ * è§’è‰²å­ç³»ç»Ÿ
+ * è´Ÿè´£æ‰€æœ‰ç©å®¶è§’è‰²çš„çŠ¶æ€æœºé€»è¾‘ï¼ˆSwitchState / OnEnter / OnLeave / Tick æ¨è¿› / è¿½å‡»ä¸äº¤äº’æµç¨‹ï¼‰
+ * æ•°æ®ç”± AHB_CharacterManager ç»´æŠ¤ï¼Œæ•´å¼ è¡¨æœåŠ¡ç«¯æƒå¨+Replicateï¼›æœ¬Subsystemä»…æ‰¿æ‹…é€»è¾‘ã€‚
  */
 UCLASS()
 class HEROBUILDER_API UHB_CharacterSubsystem : public UHB_WorldSubsystem_Base
@@ -24,11 +24,8 @@ class HEROBUILDER_API UHB_CharacterSubsystem : public UHB_WorldSubsystem_Base
 	GENERATED_BODY()
 
 private:
-	//µ¥Àı CharacterManager »º´æ£¨ÀÁ²éÕÒ£º·şÎñ¶Ë°´ĞèSpawn£¬¿Í»§¶ËÍ¨¹ıReplicationÄÃµ½£©
-	UPROPERTY()
-	mutable TObjectPtr<AHB_CharacterManager> CachedCharacterManager;
 
-	//ÒÑ×¢²á²ÎÓëTickµÄ½ÇÉ«£¨½ö·şÎñ¶ËÊ¹ÓÃ£¬¿Í»§¶ËÍ¨¹ıCharacterManager±íÏî±éÀú£©
+	//å·²æ³¨å†Œå‚ä¸Tickçš„è§’è‰²ï¼ˆä»…æœåŠ¡ç«¯ä½¿ç”¨ï¼Œå®¢æˆ·ç«¯é€šè¿‡CharacterManagerè¡¨é¡¹éå†ï¼‰
 	UPROPERTY()
 	TArray<TObjectPtr<ACharacter>> RegisteredCharacters;
 
@@ -38,19 +35,19 @@ protected:
 	virtual void OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting) override;
 
 public:
-	//¡ª¡ª Manager·ÃÎÊ ¡ª¡ª
-	AHB_CharacterManager* GetCharacterManager() const;
+	//â€”â€” Managerè®¿é—® â€”â€”
+	AHB_CharacterManager* GetCharacterManager();
 
-	//¡ª¡ª ½ÇÉ«×¢²á/·´×¢²á£¨ÓÉCharacterÔÚBeginPlay/EndPlay´¥·¢£© ¡ª¡ª
+	//â€”â€” è§’è‰²æ³¨å†Œ/åæ³¨å†Œï¼ˆç”±Characteråœ¨BeginPlay/EndPlayè§¦å‘ï¼‰ â€”â€”
 	void RegisterCharacter(ACharacter* InCharacter);
 	void UnregisterCharacter(ACharacter* InCharacter);
 
-	//¡ª¡ª ×´Ì¬»úAPI£¨·şÎñ¶ËÈ¨Íş£©¡ª¡ª
+	//â€”â€” çŠ¶æ€æœºAPIï¼ˆæœåŠ¡ç«¯æƒå¨ï¼‰â€”â€”
 	void SwitchState(ACharacter* InCharacter, EPlayerCharacterState NewState);
 	void AbortInteract(ACharacter* InCharacter);
 	void BeginInteractFlow(ACharacter* InCharacter);
 
-	//¡ª¡ª Í¬²½ÊôĞÔGetter£¨Í¸´«µ½Manager£¬±ãÓÚÍâ²¿CallerÊ¹ÓÃ£© ¡ª¡ª
+	//â€”â€” åŒæ­¥å±æ€§Getterï¼ˆé€ä¼ åˆ°Managerï¼Œä¾¿äºå¤–éƒ¨Callerä½¿ç”¨ï¼‰ â€”â€”
 	UFUNCTION(BlueprintPure, Category = "Character")
 	EPlayerCharacterState GetCurrentState(ACharacter* InCharacter) const;
 	AActor* GetInteractTarget(ACharacter* InCharacter) const;
@@ -63,31 +60,28 @@ public:
 	void SetPreInteractDelay(ACharacter* InCharacter, float Delay);
 	void SetPostInteractDelay(ACharacter* InCharacter, float Delay);
 
-	//¡ª¡ª ¹¤¾ßº¯Êı ¡ª¡ª
-	bool IsValidTarget(AActor* Target) const;
-
-	//¡ª¡ª ¿Í»§¶Ë×·»÷£º¹©Move()ÄÚ²¿ÅĞ¶Ï"ÊÇ·ñÏµÍ³Çı¶¯" ¡ª¡ª
+	//â€”â€” å®¢æˆ·ç«¯è¿½å‡»ï¼šä¾›Move()å†…éƒ¨åˆ¤æ–­"æ˜¯å¦ç³»ç»Ÿé©±åŠ¨" â€”â€”
 	bool IsInternalDrivenMove(ACharacter* InCharacter) const;
 
 private:
-	//×´Ì¬½øÈë/Àë¿ª£¨½ö·şÎñ¶ËÈ¨Íş»·¾³µ÷ÓÃ£©
+	//çŠ¶æ€è¿›å…¥/ç¦»å¼€ï¼ˆä»…æœåŠ¡ç«¯æƒå¨ç¯å¢ƒè°ƒç”¨ï¼‰
 	void OnEnterState(ACharacter* InCharacter, EPlayerCharacterState EnterState);
 	void OnLeaveState(ACharacter* InCharacter, EPlayerCharacterState LeaveState);
 	bool CanSwitchState(ACharacter* InCharacter, EPlayerCharacterState NewState, EPlayerCharacterState OldState);
 
-	//Ã¿½ÇÉ«ÍÆ½ø
+	//æ¯è§’è‰²æ¨è¿›
 	void TickCharacter(ACharacter* InCharacter, float DeltaTime);
 	void TickUpdateState(ACharacter* InCharacter, float DeltaTime);
 #if WITH_SERVER_CODE
-	//·şÎñ¶ËÈ¨Íş£º×´Ì¬»úÍÆ½ø£¨º¬SwitchState¡¢Server_TryInteractµÈ¸±×÷ÓÃ£©
+	//æœåŠ¡ç«¯æƒå¨ï¼šçŠ¶æ€æœºæ¨è¿›ï¼ˆå«SwitchStateã€Server_TryInteractç­‰å‰¯ä½œç”¨ï¼‰
 	void Tick_AuthorityState(ACharacter* InCharacter, float DeltaTime);
 #endif
 #if !UE_SERVER
-	//¿Í»§¶Ë±¾µØ£º½ö×öÊÓ¾õ/Ô¤²â´¦Àí£¬¾ø²»´¥·¢È¨ÍşÂß¼­
+	//å®¢æˆ·ç«¯æœ¬åœ°ï¼šä»…åšè§†è§‰/é¢„æµ‹å¤„ç†ï¼Œç»ä¸è§¦å‘æƒå¨é€»è¾‘
 	void Tick_LocalCosmetic(ACharacter* InCharacter, float DeltaTime);
 #endif
 
-	//ÒÆ¶¯µ½Ä¿±ê
+	//ç§»åŠ¨åˆ°ç›®æ ‡
 	void TickAuthorityMoveToTarget(ACharacter* InCharacter, float DeltaTime);
 	void TickMoveToTarget(ACharacter* InCharacter, float DeltaTime);
 };

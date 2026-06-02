@@ -9,10 +9,9 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
 #include "HeroBuilder/HeroBuilderCharacter.h"
-#include "Resource/HB_Resource_Base.h"
-#include "Enemy/HB_Enemy_Base.h"
+#include "Components/HB_InteractComponent.h"
+#include "Building/HB_Building_Base.h"
 #include "Engine/OverlapResult.h"
-#include "EngineUtils.h"
 
 DEFINE_LOG_CATEGORY(LogInteractSubsystem);
 
@@ -48,12 +47,15 @@ void UHB_InteractSubsystem::TickUpdateInteractTarget(float DeltaTime)
 			FCollisionShape::MakeSphere(InteractTraceDistance)
 		);
 
-		// 找到范围内最近的物品
+		// 在所有"挂了 InteractComponent 且当前可交互（EffectiveInteractType != IT_None）"的Actor中
+		// 挑选距离最近的一个，作为本帧的交互目标候选。
 		AActor* NewNearest = nullptr;
+		EInteractType DesiredMode = IT_None;
 		float MinDist = InteractTraceDistance;
 
 		if (bHit)
 		{
+			const FVector CharacterLocation = Character->GetActorLocation();
 			for (auto& Res : OutResults)
 			{
 				AActor* Actor = Res.GetActor();
@@ -61,19 +63,29 @@ void UHB_InteractSubsystem::TickUpdateInteractTarget(float DeltaTime)
 				{
 					continue;
 				}
-				float Dist = FVector::Dist(Character->GetActorLocation(), Actor->GetActorLocation());
+				// 仅纳入"挂了 InteractComponent 且 InteractType 有效"的 Actor
+				UHB_InteractComponent* InteractComp = Actor->FindComponentByClass<UHB_InteractComponent>();
+				if (!InteractComp)
+				{
+					continue;
+				}
+				const EInteractType ActorInteractType = InteractComp->GetEffectiveInteractType();
+				if (ActorInteractType == IT_None)
+				{
+					continue;
+				}
+
+				const float Dist = FVector::Dist(CharacterLocation, Actor->GetActorLocation());
 				if (Dist < MinDist)
 				{
 					MinDist = Dist;
 					NewNearest = Actor;
+					DesiredMode = ActorInteractType;
 				}
 			}
 		}
 
-		// 更新最近交互目标
-		HBCharacter->SetInteractTarget(NewNearest);
-
-		// 根据目标类型同步交互模式：仅在“被动模式”下自动切换，
+		// 根据目标类型同步交互模式：仅在"被动模式"下自动切换，
 		// 保留玩家主动选择的模式（如 IT_ConstructionMode）不被覆盖。
 		AHB_InteractManager* InteractMgr = GetInteractManager();
 		if (!InteractMgr)
@@ -81,36 +93,22 @@ void UHB_InteractSubsystem::TickUpdateInteractTarget(float DeltaTime)
 			continue;
 		}
 		const EInteractType CurrentMode = InteractMgr->GetCurrentInteractType(HBCharacter);
-		const bool bIsPassiveMode =
-			(CurrentMode == IT_None) ||
-			(CurrentMode == IT_Normal) ||
-			(CurrentMode == IT_Lumber) ||
-			(CurrentMode == IT_Gather) ||
-			(CurrentMode == IT_Mine) ||
-			(CurrentMode == IT_Attack);
 
-		if (bIsPassiveMode)
+		// 找到了有效目标 -> 设为 InteractTarget；否则清空。
+		if (NewNearest)
 		{
-			EInteractType DesiredMode = IT_Normal;
-			if (AHB_Resource_Base* Resource = Cast<AHB_Resource_Base>(NewNearest))
-			{
-				if (!Resource->IsDeath())
-				{
-					DesiredMode = Resource->GetInteractMode();
-				}
-			}
-			else if (AHB_Enemy_Base* Enemy = Cast<AHB_Enemy_Base>(NewNearest))
-			{
-				if (!Enemy->IsDeath())
-				{
-					DesiredMode = IT_Attack;
-				}
-			}
+			HBCharacter->SetInteractTarget(NewNearest);
+		}
+		else
+		{
+			HBCharacter->SetInteractTarget(nullptr);
+		}
 
-			if (DesiredMode != CurrentMode)
-			{
-				SwitchInteractType(HBCharacter, DesiredMode);
-			}
+		// 同步当前角色的 InteractType（无有效目标 -> 回落到 IT_Normal）
+		const EInteractType ApplyMode = (DesiredMode != IT_None) ? DesiredMode : IT_Normal;
+		if (ApplyMode != CurrentMode)
+		{
+			SwitchInteractType(HBCharacter, ApplyMode);
 		}
 	}
 }
@@ -139,9 +137,6 @@ void UHB_InteractSubsystem::OnPlayerLogin(AGameModeBase* GameMode, APlayerContro
 {
 	Super::OnPlayerLogin(GameMode, PlayerController);
 	PlayerControllers.AddUnique(PlayerController);
-
-	//服务端：保证单例InteractManager已存在。首个玩家登录时按需Spawn。
-	GetInteractManager();
 }
 
 void UHB_InteractSubsystem::OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting)
@@ -163,45 +158,11 @@ void UHB_InteractSubsystem::OnPlayerLogout(AGameModeBase* GameMode, AController*
 	}
 }
 
-AHB_InteractManager* UHB_InteractSubsystem::GetInteractManager() const
+AHB_InteractManager* UHB_InteractSubsystem::GetInteractManager()
 {
-	//缓存命中且有效：直接返回
-	if (IsValid(CachedInteractManager))
-	{
-		return CachedInteractManager;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return nullptr;
-	}
-
-	//遍历世界查找已存在的单例（服务端/客户端均适用；客户端仅能这里拿到复制下来的实例）
-	for (TActorIterator<AHB_InteractManager> It(World); It; ++It)
-	{
-		AHB_InteractManager* Mgr = *It;
-		if (IsValid(Mgr))
-		{
-			CachedInteractManager = Mgr;
-			return Mgr;
-		}
-	}
-
-	//未找到：仅服务端有权限Spawn
-	if (NetMode != ENetMode::NM_Client)
-	{
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		AHB_InteractManager* NewMgr = World->SpawnActor<AHB_InteractManager>(AHB_InteractManager::StaticClass(), SpawnParams);
-		if (NewMgr)
-		{
-			CachedInteractManager = NewMgr;
-			return NewMgr;
-		}
-		UE_LOG(LogInteractSubsystem, Error, TEXT("Failed to spawn singleton AHB_InteractManager"));
-	}
-	return nullptr;
+	//统一走基类通道：服务端读 GameMode 的 Manager 列表，客户端读 GameState 上已复制的 Manager 列表。
+	//Manager 的创建交给 AHeroBuilderGameMode::StartPlay 统一 Spawn，子系统不再自行 Spawn。
+	return GetManager<AHB_InteractManager>();
 }
 
 void UHB_InteractSubsystem::SwitchInteractType(ACharacter* InCharacter, EInteractType NewMode)
@@ -330,7 +291,7 @@ EInteractType UHB_InteractSubsystem::GetInteractType(ACharacter* InCharacter) co
 	{
 		return IT_None;
 	}
-	if (AHB_InteractManager* InteractMgr = GetInteractManager())
+	if (AHB_InteractManager* InteractMgr = const_cast<UHB_InteractSubsystem*>(this)->GetInteractManager())
 	{
 		return InteractMgr->GetCurrentInteractType(InCharacter);
 	}
@@ -343,7 +304,7 @@ EInteractMode UHB_InteractSubsystem::GetInteractMode(ACharacter* InCharacter) co
 	{
 		return IM_Normal;
 	}
-	if (AHB_InteractManager* InteractMgr = GetInteractManager())
+	if (AHB_InteractManager* InteractMgr = const_cast<UHB_InteractSubsystem*>(this)->GetInteractManager())
 	{
 		return InteractMgr->GetCurrentInteractMode(InCharacter);
 	}
@@ -515,7 +476,21 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 		case IT_Normal:
 			break;
 		case IT_Construction:
+		{
+			//面向"待修建建筑"：玩家普通模式下交互即为修建/治疗，治疗量复用 Attack 属性
+			AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
+			if (!HBCharacter)
+			{
+				break;
+			}
+			AHB_Building_Base* TargetBuilding = Cast<AHB_Building_Base>(HBCharacter->GetInteractTarget());
+			if (TargetBuilding && TargetBuilding->IsAwaitingConstruction())
+			{
+				const float HealAmount = HBCharacter->GetAttack();
+				TargetBuilding->HealAsConstruction(HealAmount, InCharacter);
+			}
 			break;
+		}
 		case IT_Lumber:
 		case IT_Gather:
 		case IT_Mine:

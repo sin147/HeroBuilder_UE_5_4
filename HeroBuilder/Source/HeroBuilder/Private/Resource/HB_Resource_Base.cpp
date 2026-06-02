@@ -8,6 +8,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Components/HB_DamageComponent.h"
+#include "Components/HB_InteractComponent.h"
 
 DEFINE_LOG_CATEGORY(LogResource)
 
@@ -34,6 +35,9 @@ AHB_Resource_Base::AHB_Resource_Base()
 
 	// 创建伤害组件
 	DamageComponent = CreateDefaultSubobject<UHB_DamageComponent>(TEXT("DamageComponent"));
+
+	// 创建交互组件：描述本Actor对应的玩家交互类型（默认 IT_Normal，子类或配置初始化时覆盖）
+	InteractComponent = CreateDefaultSubobject<UHB_InteractComponent>(TEXT("InteractComponent"));
 }
 
 FString AHB_Resource_Base::GetStateName(EResourceState State)
@@ -113,6 +117,11 @@ void AHB_Resource_Base::HandleHealthChanged(float OldHealth, float NewHealth, fl
 void AHB_Resource_Base::HandleDeath(AActor* Attacker)
 {
 	SwitchState(RS_Death);
+	// 死亡后不再吸引玩家切换交互类型
+	if (InteractComponent)
+	{
+		InteractComponent->SetIsInteractable(false);
+	}
 	OnDeath();
 
 	// 通知子系统处理资源掉落与销毁
@@ -212,6 +221,14 @@ void AHB_Resource_Base::InitialResource(const FResourceConfig& InConfig)
 	DeathTime = InConfig.DeathTime;
 	ResourceType = InConfig.ResourceType;
 	ResourceAmount = InConfig.ResourceAmount;
-	InteractMode = InConfig.InteractMode;
+	if (InteractComponent)
+	{
+		InteractComponent->SetInteractType(InConfig.InteractMode);
+	}
+}
+
+EInteractType AHB_Resource_Base::GetInteractMode() const
+{
+	return InteractComponent ? InteractComponent->GetInteractType() : IT_Normal;
 }
 

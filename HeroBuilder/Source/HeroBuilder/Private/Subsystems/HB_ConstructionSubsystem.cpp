@@ -154,7 +154,11 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 bool UHB_ConstructionSubsystem::CheckCanConstruction(ACharacter* InCharacter)
 {
 	AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
-	AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingMeshActorMap[InCharacter];
+    AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingMeshActorMap.FindRef(InCharacter);
+    if (!TargetPreStaticMeshActor)
+    {
+        return false;
+    }
 	FVector CheckLocation = TargetPreStaticMeshActor->GetActorLocation();
 	FVector2D GridIndex = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->CalulateGridIndexByLocation(CheckLocation);
 

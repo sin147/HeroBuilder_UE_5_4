@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+ï»¿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Manager/HB_CharacterManager.h"
@@ -9,7 +9,7 @@ AHB_CharacterManager::AHB_CharacterManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
-	bAlwaysRelevant = true; //µ¥Àı Manager£ºËùÓĞ¿Í»§¶Ë¶¼ĞèÒªÄÃµ½ÕâÕÅ±í
+	bAlwaysRelevant = true; //å•ä¾‹ Managerï¼šæ‰€æœ‰å®¢æˆ·ç«¯éƒ½éœ€è¦æ‹¿åˆ°è¿™å¼ è¡¨
 }
 
 void AHB_CharacterManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -88,7 +88,7 @@ void AHB_CharacterManager::RemoveEntry(ACharacter* InCharacter)
 	InternalDrivenMoveMap.Remove(InCharacter);
 }
 
-//¡ª¡ª Í¬²½ÊôĞÔ·ÃÎÊ ¡ª¡ª
+//â€”â€” åŒæ­¥å±æ€§è®¿é—® â€”â€”
 EPlayerCharacterState AHB_CharacterManager::GetCurrentlyState(ACharacter* InCharacter) const
 {
 	if (const FCharacterStateEntry* Entry = FindEntry(InCharacter))
@@ -197,7 +197,7 @@ void AHB_CharacterManager::SetInteractRange(ACharacter* InCharacter, float NewRa
 	FindOrAddEntry(InCharacter).InteractRange = NewRange;
 }
 
-//¡ª¡ª ·ÇÍ¬²½ÔËĞĞÆÚÊı¾İ ¡ª¡ª
+//â€”â€” éåŒæ­¥è¿è¡ŒæœŸæ•°æ® â€”â€”
 float AHB_CharacterManager::GetCurrentInteractDelay(ACharacter* InCharacter) const
 {
 	if (!IsValid(InCharacter))

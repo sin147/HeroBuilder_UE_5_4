@@ -6,6 +6,7 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "../HeroBuilderGameMode.h"
+#include "../HeroBuilderGameState.h"
 #include "HB_WorldSubsystem_Base.generated.h"
 
 /**
@@ -28,12 +29,28 @@ public:
 	template <typename T>
 	T* GetManager()
 	{
-		AHeroBuilderGameMode* GM = Cast<AHeroBuilderGameMode>(UGameplayStatics::GetGameMode(this->GetWorld()));
-		if (!GM)
+		UWorld* World = this->GetWorld();
+		if (!World)
 		{
 			return nullptr;
 		}
-		return GM->GetManager<T>();
+
+		// 服务端：走 GameMode 的快路径（保持原行为）
+		if (AHeroBuilderGameMode* GM = Cast<AHeroBuilderGameMode>(UGameplayStatics::GetGameMode(World)))
+		{
+			if (T* Mgr = GM->GetManager<T>())
+			{
+				return Mgr;
+			}
+		}
+
+		// 客户端：GameMode 在客户端为 null，从 GameState 读取已复制过来的 Manager 列表
+		if (AHeroBuilderGameState* GS = World->GetGameState<AHeroBuilderGameState>())
+		{
+			return GS->GetManager<T>();
+		}
+
+		return nullptr;
 	}
 	template <typename T>
 	T* GetHelper()

@@ -26,10 +26,6 @@ private:
 	//玩家控制器列表
 	TArray<APlayerController*> PlayerControllers;
 
-	//单例 InteractManager 缓存（懒查找：服务端按需Spawn，客户端通过Replication拿到）
-	UPROPERTY()
-	mutable TObjectPtr<AHB_InteractManager> CachedInteractManager;
-
 	//交互检测距离
 	float InteractTraceDistance = 500.f;
 
@@ -41,8 +37,8 @@ protected:
 	virtual void OnPlayerLogin(AGameModeBase* GameMode, APlayerController* PlayerController) override;
 	virtual void OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting) override;
 public:
-	//获取单例 InteractManager；服务端在缺失时按需Spawn一个，客户端只读取已复制的实例
-	AHB_InteractManager* GetInteractManager() const;
+	//获取单例 InteractManager：统一走基类 GetManager<T>()，服务端读 GameMode、客户端读已复制的 GameState
+	AHB_InteractManager* GetInteractManager();
 
 	//切换玩家交互模式
 	void SwitchInteractType(ACharacter* InCharacter, EInteractType NewMode);

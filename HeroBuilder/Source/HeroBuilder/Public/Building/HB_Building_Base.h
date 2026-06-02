@@ -9,6 +9,7 @@
 #include "HB_Building_Base.generated.h"
 
 class UHB_DamageComponent;
+class UHB_InteractComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogBuilding, Log, All);
 
@@ -79,6 +80,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Damage")
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
 
+	/** 交互组件：玩家靠近本建筑时应进入哪种交互类型（默认 IT_Attack） */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interact")
+	TObjectPtr<UHB_InteractComponent> InteractComponent;
+
 	//服务端死亡
 	void Server_Death();
 	//攻击表现
@@ -125,6 +130,13 @@ public:
 	//获取攻击力
 	UFUNCTION(Category = "Attribute|Attack",BlueprintPure)
 	float GetAttack() { return Attack; }
+
+	//是否处于"待修建"状态：当前死亡（血量为 0），可被玩家通过 IM_Normal 交互治疗复活
+	UFUNCTION(BlueprintPure, Category = "Construction")
+	bool IsAwaitingConstruction() const;
+
+	//作为"被修建"接收治疗：若死亡则先复活 DamageComponent，再治疗指定数值；血量回满后切回 BS_Idle
+	void HealAsConstruction(float Amount, AActor* Healer);
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 

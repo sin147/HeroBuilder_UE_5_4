@@ -10,6 +10,7 @@
 #include "HB_Resource_Base.generated.h"
 
 class UHB_DamageComponent;
+class UHB_InteractComponent;
 
 struct FResourceConfig;
 DECLARE_LOG_CATEGORY_EXTERN(LogResource, Log, All);
@@ -68,10 +69,6 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
 	int32 ResourceAmount = 10;
 
-	//玩家靠近此资源时应自动切换到的交互模式（例如树木→IT_LumberMode、矿石→IT_MineMode）
-	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
-	TEnumAsByte<EInteractType> InteractMode = IT_Normal;
-
 protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
 	TEnumAsByte<EResourceState> CurrentState;
@@ -92,6 +89,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Damage")
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
 
+	/** 交互组件：统一描述本Actor对应的玩家交互类型（吸引玩家进入哪种 EInteractType） */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interact")
+	TObjectPtr<UHB_InteractComponent> InteractComponent;
+
 public:
 	// Sets default values for this actor's properties
 	AHB_Resource_Base();
@@ -109,9 +110,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	int32 GetResourceAmount() const { return ResourceAmount; }
 
-	//获取该资源关联的交互模式
+	//获取该资源关联的交互模式（转发到 InteractComponent，保留旧接口语义）
 	UFUNCTION(BlueprintCallable)
-	EInteractType GetInteractMode() const { return InteractMode; }
+	EInteractType GetInteractMode() const;
 
 protected:
 	// Called when the game starts or when spawned

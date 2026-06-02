@@ -2,6 +2,7 @@
 
 #include "HeroBuilderGameMode.h"
 #include "HeroBuilderCharacter.h"
+#include "HeroBuilderGameState.h"
 #include "Manager/HB_Base_Manager.h"
 #include "Helper/HB_Base_Helper.h"
 #include "UObject/ConstructorHelpers.h"
@@ -16,11 +17,17 @@ AHeroBuilderGameMode::AHeroBuilderGameMode()
 	{
 		DefaultPawnClass = PlayerPawnBPClass.Class;
 	}
+
+	// 指定使用自定义 GameState：把 Manager 数组复制到所有客户端
+	GameStateClass = AHeroBuilderGameState::StaticClass();
 }
 
 void AHeroBuilderGameMode::StartPlay()
 {
 	Super::StartPlay();
+
+	AHeroBuilderGameState* HBGS = GetGameState<AHeroBuilderGameState>();
+
 	for (TObjectIterator<UClass> It; It; ++It)
 	{
 		UClass* CurrentClass = *It;
@@ -42,6 +49,11 @@ void AHeroBuilderGameMode::StartPlay()
 			if (IsValid(Manager))
 			{
 				Managers.Add(Manager);
+				// 注册到 GameState，使 Manager 引用复制到所有客户端
+				if (HBGS)
+				{
+					HBGS->RegisterManager(Manager);
+				}
 				UE_LOG(LogHeroBuilderGameMode, Log, TEXT("Create manager %s"), *Manager->GetName());
 			}
 		}

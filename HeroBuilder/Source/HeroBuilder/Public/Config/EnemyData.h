@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Enemy/HB_Enemy_Base.h"
+#include "Config/InteractData.h"
 #include "EnemyData.generated.h"
 
 /**
@@ -29,6 +30,10 @@ public:
 	float PostAttackDelay = 1;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Enemy", SimpleDisplay="生命值")
 	float Health = 100;
+
+	//玩家靠近本敌人时应进入哪种交互类型（默认 IT_Attack：敌人作为可被攻击的目标）
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Enemy", SimpleDisplay="交互类型")
+	TEnumAsByte<EInteractType> InteractType = IT_Attack;
 };
 
 /**

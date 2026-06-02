@@ -10,6 +10,7 @@
 #include "HB_Enemy_Base.generated.h"
 
 class UHB_DamageComponent;
+class UHB_InteractComponent;
 
 struct FEnemyConfig;
 class AHB_Building_Base;
@@ -82,6 +83,10 @@ protected:
 	/** 伤害组件：维护血量与伤害逻辑 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Damage")
 	TObjectPtr<UHB_DamageComponent> DamageComponent;
+
+	/** 交互组件：玩家靠近本敌人时应进入哪种交互类型（默认 IT_Attack） */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interact")
+	TObjectPtr<UHB_InteractComponent> InteractComponent;
 
 	//初始血量
 	float MaxHealth = 100.f;

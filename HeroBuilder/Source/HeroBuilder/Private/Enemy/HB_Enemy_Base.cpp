@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Subsystems/HB_EnemySubsystem.h"
 #include "Components/HB_DamageComponent.h"
+#include "Components/HB_InteractComponent.h"
 
 DEFINE_LOG_CATEGORY(LogEnemy)
 
@@ -60,6 +61,13 @@ AHB_Enemy_Base::AHB_Enemy_Base()
 
 	// 创建伤害组件
 	DamageComponent = CreateDefaultSubobject<UHB_DamageComponent>(TEXT("DamageComponent"));
+
+	// 创建交互组件：敌人默认作为可被攻击的目标，玩家靠近时切为 IT_Attack
+	InteractComponent = CreateDefaultSubobject<UHB_InteractComponent>(TEXT("InteractComponent"));
+	if (InteractComponent)
+	{
+		InteractComponent->SetInteractType(IT_Attack);
+	}
 }
 
 bool AHB_Enemy_Base::IsDeath()
@@ -102,6 +110,10 @@ void AHB_Enemy_Base::HandleHealthChanged(float OldHealth, float NewHealth, float
 void AHB_Enemy_Base::HandleDeath(AActor* Attacker)
 {
 	SwitchState(EEnemyState::ES_Death);
+	if (InteractComponent)
+	{
+		InteractComponent->SetIsInteractable(false);
+	}
 	if (IsValid(AIController))
 	{
 		AIController->StopMovement();
@@ -389,7 +401,13 @@ void AHB_Enemy_Base::InitialEnemy(const FEnemyConfig& InConfig)
 	{
 		GetCharacterMovement()->MaxWalkSpeed = InConfig.MoveSpeed;
 	}
-	
+
+	//将配置中的交互类型应用到 InteractComponent，覆盖构造函数中的默认值（IT_Attack）
+	if (InteractComponent)
+	{
+		InteractComponent->SetInteractType(InConfig.InteractType);
+	}
+
 	// 记录配置信息（可以根据需要添加更多属性设置）
 	UE_LOG(LogEnemy, Log, TEXT("Enemy initialized successfully"));
 }

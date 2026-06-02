@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Building/HB_Building_Base.h"
+#include "Config/InteractData.h"
 #include "BuildingData.generated.h"
 
 /**
@@ -29,6 +30,10 @@ public:
     float PreAttackDelay=1;
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Building",SimpleDisplay="后攻击延迟")
     float PostAttackDelay=1;
+
+	//玩家靠近本建筑时应进入哪种交互类型（默认 IT_Attack：建筑作为可被攻击的目标）
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Building", SimpleDisplay = "交互类型")
+	TEnumAsByte<EInteractType> InteractType = IT_Construction;
 
 };
 
