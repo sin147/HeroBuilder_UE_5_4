@@ -16,7 +16,7 @@ void UHB_DamageSubsystem::TakeDamage(AActor* Attacker, float Damage, AActor* Tar
 	}
 	if (Target->FindComponentByClass<UHB_DamageComponent>())
 	{
-		DamageQueue.Enqueue(FDamageInfo(Attacker, Damage, Target));
+		DamageQueue.Add(FDamageInfo(Attacker, Damage, Target));
 	}
 	else
 	{
@@ -152,23 +152,38 @@ void UHB_DamageSubsystem::TakeSphereRangeDamage(AActor* Attacker, float Damage, 
 
 void UHB_DamageSubsystem::Tick(float DeltaTime)
 {
-	int32 ProcessedCount = 0;
-	const int32 MaxProcessPerTick = 50; // 每帧最多处理50条伤害，避免卡帧
-	while(!DamageQueue.IsEmpty() && ProcessedCount < MaxProcessPerTick)
+	if (DamageQueue.Num() == 0)
 	{
-		FDamageInfo DamageInfo;
-		if (DamageQueue.Dequeue(DamageInfo))
-		{
-			if (!IsValid(DamageInfo.Target))
-			{
-				ProcessedCount++;
-				continue;
-			}
-			if (UHB_DamageComponent* DamageComp = DamageInfo.Target->FindComponentByClass<UHB_DamageComponent>())
-			{
-				DamageComp->ApplyDamage(DamageInfo.Attacker, DamageInfo.Damage);
-			}
-		}
-		ProcessedCount++;
+		return;
 	}
+
+	const int32 MaxProcessPerTick = 50; // 每帧最多处理50条伤害，避免卡帧
+	const int32 ProcessNum = FMath::Min(DamageQueue.Num(), MaxProcessPerTick);
+
+	for (int32 Index = 0; Index < ProcessNum; ++Index)
+	{
+		const FDamageInfo& DamageInfo = DamageQueue[Index];
+
+		// 由 UPROPERTY + TArray 持有，GC 不会回收 Target/Attacker；
+		// 但仍可能因显式 Destroy 等原因变为无效，需校验。
+		AActor* TargetPtr = DamageInfo.Target;
+		if (!IsValid(TargetPtr))
+		{
+			continue;
+		}
+
+		AActor* AttackerPtr = DamageInfo.Attacker;
+		if (!IsValid(AttackerPtr))
+		{
+			AttackerPtr = nullptr;
+		}
+
+		if (UHB_DamageComponent* DamageComp = TargetPtr->FindComponentByClass<UHB_DamageComponent>())
+		{
+			DamageComp->ApplyDamage(AttackerPtr, DamageInfo.Damage);
+		}
+	}
+
+	// 批量移除已处理的前 ProcessNum 条，避免逐个 RemoveAt(0) 的 O(n^2) 开销
+	DamageQueue.RemoveAt(0, ProcessNum, EAllowShrinking::No);
 }

@@ -11,6 +11,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
+#include "Camera/CameraComponent.h"
 #include "InputActionValue.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -24,44 +25,16 @@ DEFINE_LOG_CATEGORY(LogCharacterSubsystem);
 void UHB_CharacterSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	//服务端：遍历已注册角色推进权威状态机
-	if (NetMode != ENetMode::NM_Client)
+	//先批量清理无效角色，避免range-based for期间修改容器
+	RegisteredCharacters.RemoveAllSwap([](const TObjectPtr<ACharacter>& Char)
 	{
-		for (int32 Idx = RegisteredCharacters.Num() - 1; Idx >= 0; --Idx)
-		{
-			ACharacter* Character = RegisteredCharacters[Idx].Get();
-			if (!IsValid(Character))
-			{
-				RegisteredCharacters.RemoveAtSwap(Idx);
-				continue;
-			}
-			TickCharacter(Character, DeltaTime);
-		}
-	}
-#if !UE_SERVER
-	//非DedicatedServer构建：客户端通过Manager表项驱动本地视觉处理
-	if (GetWorld() && GetWorld()->GetNetMode() != NM_DedicatedServer)
+		return !IsValid(Char);
+	});
+	//容器已稳定，安全使用range-based for
+	for (ACharacter* Character : RegisteredCharacters)
 	{
-		AHB_CharacterManager* Mgr = GetCharacterManager();
-		if (!Mgr)
-		{
-			return;
-		}
-		for (const FCharacterStateEntry& Entry : Mgr->GetAllEntries())
-		{
-			if (!IsValid(Entry.Character))
-			{
-				continue;
-			}
-			//服务端机器在上面的循环里已处理过（Tick_LocalCosmetic也会走），这里仅在纯客户端机器上跑
-			if (NetMode == ENetMode::NM_Client)
-			{
-				Tick_LocalCosmetic(Entry.Character, DeltaTime);
-			}
-		}
+		TickCharacter(Character, DeltaTime);
 	}
-#endif
 }
 
 void UHB_CharacterSubsystem::OnPlayerLogin(AGameModeBase* GameMode, APlayerController* PlayerController)
@@ -196,29 +169,22 @@ void UHB_CharacterSubsystem::SetInteractRange(ACharacter* InCharacter, float New
 	}
 }
 
-void UHB_CharacterSubsystem::SetPreInteractDelay(ACharacter* InCharacter, float Delay)
+UCameraComponent* UHB_CharacterSubsystem::GetCharacterFollowCamera(AHeroBuilderCharacter* InCharacter) const
 {
-	if (AHB_CharacterManager* Mgr = GetCharacterManager())
+	if (IsValid(InCharacter))
 	{
-		Mgr->SetPreInteractDelay(InCharacter, Delay);
+		return InCharacter->FollowCamera;
 	}
+	return nullptr;
 }
 
-void UHB_CharacterSubsystem::SetPostInteractDelay(ACharacter* InCharacter, float Delay)
+FVector UHB_CharacterSubsystem::GetCharacterFollowCameraForward(AHeroBuilderCharacter* InCharacter) const
 {
-	if (AHB_CharacterManager* Mgr = GetCharacterManager())
-	{
-		Mgr->SetPostInteractDelay(InCharacter, Delay);
-	}
-}
-
-bool UHB_CharacterSubsystem::IsInternalDrivenMove(ACharacter* InCharacter) const
-{
-	if (AHB_CharacterManager* Mgr = const_cast<UHB_CharacterSubsystem*>(this)->GetCharacterManager())
-	{
-		return Mgr->GetInternalDrivenMove(InCharacter);
-	}
-	return false;
+    if (UCameraComponent* Camera = GetCharacterFollowCamera(InCharacter))
+    {
+        return Camera->GetForwardVector();
+    }
+    return FVector::ForwardVector;
 }
 
 //——————————————————————————————————————————————
@@ -228,11 +194,6 @@ bool UHB_CharacterSubsystem::IsInternalDrivenMove(ACharacter* InCharacter) const
 void UHB_CharacterSubsystem::SwitchState(ACharacter* InCharacter, EPlayerCharacterState NewState)
 {
 	if (!IsValid(InCharacter))
-	{
-		return;
-	}
-	//SwitchState 仅在服务端权威环境下生效
-	if (!InCharacter->HasAuthority())
 	{
 		return;
 	}
@@ -334,7 +295,6 @@ void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharac
 	Mgr->SetCurrentlyState(InCharacter, EnterState);
 	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)EnterState);
 	UE_LOG(LogCharacterSubsystem, Log, TEXT("'%s' Enter State '%s'!"), *GetNameSafe(InCharacter), *StateName);
-
 	switch (EnterState)
 	{
 	case EPCS_None:
@@ -348,44 +308,31 @@ void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharac
 		break;
 	case EPCS_PreInteract:
 	{
-		const float PreDelay = Mgr->GetPreInteractDelay(InCharacter);
-		if (PreDelay > 0.f)
+		if(GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetPreInteractDelay(InCharacter)<= 0.f)
 		{
-			Mgr->SetCurrentInteractDelay(InCharacter, PreDelay);
-		}
-		else
-		{
-			//无前摇：通过SwitchState正常进入Interact，保证Leave/Enter链完整
+			//没有前摇时，直接进入交互
 			SwitchState(InCharacter, EPCS_Interact);
 		}
+		CharacterInteractTimer.FindOrAdd(InCharacter) = 0.f;
 		break;
 	}
 	case EPCS_Interact:
 	{
-		//进入交互帧：只触发一次交互，随即进入后摇
-		if (UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>())
-		{
-			InteractSys->TryInteract(InCharacter);
-		}
 		SwitchState(InCharacter, EPCS_PostInteract);
 		break;
 	}
 	case EPCS_PostInteract:
 	{
-		const float PostDelay = Mgr->GetPostInteractDelay(InCharacter);
-		if (PostDelay > 0.f)
-		{
-			Mgr->SetCurrentInteractDelay(InCharacter, PostDelay);
-		}
-		else
+        if (GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetPostInteractDelay(InCharacter) <= 0.f)
 		{
 			SwitchState(InCharacter, EPCS_PreInteract);
-		}
-		break;
+        }
+        break;
 	}
 	default:
 		break;
 	}
+	GetManager<AHB_CharacterManager>()->SetCurrentlyState(InCharacter, EnterState);
 }
 
 void UHB_CharacterSubsystem::OnLeaveState(ACharacter* InCharacter, EPlayerCharacterState LeaveState)
@@ -398,17 +345,27 @@ void UHB_CharacterSubsystem::OnLeaveState(ACharacter* InCharacter, EPlayerCharac
 		break;
 	case EPCS_Move:
 	{
-		if (UCharacterMovementComponent* Move = InCharacter->GetCharacterMovement())
+		//仅本地驱动方（自治代理/服务端权威）才需要主动停止；SimulatedProxy由网络同步驱动，无需手动Stop
+		const ENetRole LocalRole = InCharacter->GetLocalRole();
+		if (LocalRole == ROLE_AutonomousProxy || LocalRole == ROLE_Authority)
 		{
-			Move->StopMovementImmediately();
-		}
+			if (UCharacterMovementComponent* Move = InCharacter->GetCharacterMovement())
+			{
+				Move->StopMovementImmediately();
+			}
+        }
 		break;
 	}
 	case EPCS_MoveToTarget:
 	{
-		if (UCharacterMovementComponent* Move = InCharacter->GetCharacterMovement())
+		//仅本地驱动方（自治代理/服务端权威）才需要主动停止；与TickMoveToTarget的驱动判断保持一致
+		const ENetRole LocalRole = InCharacter->GetLocalRole();
+		if (LocalRole == ROLE_AutonomousProxy || LocalRole == ROLE_Authority)
 		{
-			Move->StopMovementImmediately();
+			if (UCharacterMovementComponent* Move = InCharacter->GetCharacterMovement())
+			{
+				Move->StopMovementImmediately();
+			}
 		}
 		break;
 	}
@@ -422,6 +379,7 @@ void UHB_CharacterSubsystem::OnLeaveState(ACharacter* InCharacter, EPlayerCharac
 		break;
 	}
 	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)LeaveState);
+	GetManager<AHB_CharacterManager>()->SetCurrentlyState(InCharacter, EPCS_None);
 	UE_LOG(LogCharacterSubsystem, Log, TEXT("'%s' Leave State '%s'!"), *GetNameSafe(InCharacter), *StateName);
 }
 
@@ -445,8 +403,6 @@ void UHB_CharacterSubsystem::AbortInteract(ACharacter* InCharacter)
 	{
 		return;
 	}
-	//清零计时，避免被Tick残留消耗
-	Mgr->SetCurrentInteractDelay(InCharacter, 0.f);
 	SwitchState(InCharacter, EPCS_Idle);
 	UE_LOG(LogCharacterSubsystem, Log, TEXT("'%s' AbortInteract: interact flow aborted."), *GetNameSafe(InCharacter));
 }
@@ -504,20 +460,8 @@ void UHB_CharacterSubsystem::TickCharacter(ACharacter* InCharacter, float DeltaT
 	{
 		return;
 	}
-#if WITH_SERVER_CODE
-	if (InCharacter->HasAuthority())
-	{
-		TickUpdateState(InCharacter, DeltaTime);
-		Tick_AuthorityState(InCharacter, DeltaTime);
-	}
-#endif
-#if !UE_SERVER
-	//服务端机器（含Listen Server / 编辑器Game模式）也需要本地视觉
-	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
-	{
-		Tick_LocalCosmetic(InCharacter, DeltaTime);
-	}
-#endif
+	TickUpdateState(InCharacter, DeltaTime);
+	TickCharacterState(InCharacter, DeltaTime);
 }
 
 void UHB_CharacterSubsystem::TickUpdateState(ACharacter* InCharacter, float DeltaTime)
@@ -550,70 +494,8 @@ void UHB_CharacterSubsystem::TickUpdateState(ACharacter* InCharacter, float Delt
 	}
 }
 
-#if WITH_SERVER_CODE
-void UHB_CharacterSubsystem::Tick_AuthorityState(ACharacter* InCharacter, float DeltaTime)
+void UHB_CharacterSubsystem::TickCharacterState(ACharacter* InCharacter, float DeltaTime)
 {
-	AHB_CharacterManager* Mgr = GetCharacterManager();
-	if (!Mgr)
-	{
-		return;
-	}
-	const EPlayerCharacterState State = Mgr->GetCurrentlyState(InCharacter);
-	switch (State)
-	{
-	case EPCS_None:
-		break;
-	case EPCS_Idle:
-		break;
-	case EPCS_Move:
-		break;
-	case EPCS_MoveToTarget:
-	{
-		//服务端只做"到达则切PreInteract / 目标失效则中止"的状态推进
-		TickAuthorityMoveToTarget(InCharacter, DeltaTime);
-		break;
-	}
-	case EPCS_PreInteract:
-	{
-		float CurDelay = Mgr->GetCurrentInteractDelay(InCharacter);
-		if (CurDelay > 0.f)
-		{
-			CurDelay -= DeltaTime;
-			Mgr->SetCurrentInteractDelay(InCharacter, CurDelay);
-		}
-		else
-		{
-			SwitchState(InCharacter, EPCS_Interact);
-		}
-		break;
-	}
-	case EPCS_Interact:
-		break;
-	case EPCS_PostInteract:
-	{
-		float CurDelay = Mgr->GetCurrentInteractDelay(InCharacter);
-		if (CurDelay > 0.f)
-		{
-			CurDelay -= DeltaTime;
-			Mgr->SetCurrentInteractDelay(InCharacter, CurDelay);
-		}
-		else
-		{
-			BeginInteractFlow(InCharacter);
-		}
-		break;
-	}
-	default:
-		break;
-	}
-}
-#endif // WITH_SERVER_CODE
-
-#if !UE_SERVER
-void UHB_CharacterSubsystem::Tick_LocalCosmetic(ACharacter* InCharacter, float DeltaTime)
-{
-	//客户端本地：CurrentlyState由服务端Replicate同步过来，只读使用，
-	//严禁调用SwitchState、严禁修改任何Replicated属性。
 	AHB_CharacterManager* Mgr = GetCharacterManager();
 	if (!Mgr)
 	{
@@ -635,16 +517,39 @@ void UHB_CharacterSubsystem::Tick_LocalCosmetic(ACharacter* InCharacter, float D
 		break;
 	}
 	case EPCS_PreInteract:
-		break;
+    {
+        if (CharacterInteractTimer.Contains(InCharacter) && CharacterInteractTimer[InCharacter] >= GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetPreInteractDelay(InCharacter))
+        {
+            SwitchState(InCharacter, EPCS_Interact);
+        }
+        break;
+    }
 	case EPCS_Interact:
-		break;
+    {
+        //更新交互计时器
+        if (CharacterInteractTimer.Contains(InCharacter))
+        {
+            CharacterInteractTimer[InCharacter] += DeltaTime;
+        }
+        break;
+    }
 	case EPCS_PostInteract:
-		break;
+    {
+        //更新交互计时器
+        if (CharacterInteractTimer.Contains(InCharacter))
+        {
+            CharacterInteractTimer[InCharacter] += DeltaTime;
+        }
+		if (CharacterInteractTimer[InCharacter] >= GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetPostInteractDelay(InCharacter))
+		{
+			SwitchState(InCharacter, EPCS_PreInteract);
+		}
+        break;
+    }
 	default:
 		break;
 	}
 }
-#endif // !UE_SERVER
 
 //——————————————————————————————————————————————
 // 追击目标
@@ -729,8 +634,5 @@ void UHB_CharacterSubsystem::TickMoveToTarget(ACharacter* InCharacter, float Del
 		MoveInput2D.Y = DirXY.X;
 	}
 
-	//设置内部驱动标记以绕过状态屏蔽
-	Mgr->SetInternalDrivenMove(InCharacter, true);
 	HBChar->Move(FInputActionValue(MoveInput2D));
-	Mgr->SetInternalDrivenMove(InCharacter, false);
 }

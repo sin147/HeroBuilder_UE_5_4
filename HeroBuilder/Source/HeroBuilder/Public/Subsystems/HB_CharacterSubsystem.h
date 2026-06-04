@@ -28,6 +28,7 @@ private:
 	//已注册参与Tick的角色（仅服务端使用，客户端通过CharacterManager表项遍历）
 	UPROPERTY()
 	TArray<TObjectPtr<ACharacter>> RegisteredCharacters;
+	TMap<TObjectPtr<ACharacter>, float> CharacterInteractTimer;
 
 protected:
 	virtual void Tick(float DeltaTime) override;
@@ -57,13 +58,11 @@ public:
 	void SetAttack(ACharacter* InCharacter, float NewAttack);
 	float GetInteractRange(ACharacter* InCharacter) const;
 	void SetInteractRange(ACharacter* InCharacter, float NewRange);
-	void SetPreInteractDelay(ACharacter* InCharacter, float Delay);
-	void SetPostInteractDelay(ACharacter* InCharacter, float Delay);
-	UFUNCTION(BlueprintPure, Category = "Character|Interact")
-	float GetCurrentInteractDelay(ACharacter* InCharacter) const;
 
-	//—— 客户端追击：供Move()内部判断"是否系统驱动" ——
-	bool IsInternalDrivenMove(ACharacter* InCharacter) const;
+	UFUNCTION(BlueprintPure, Category = "Character|Move")
+	UCameraComponent* GetCharacterFollowCamera(AHeroBuilderCharacter* InCharacter) const;
+	UFUNCTION(BlueprintPure, Category = "Character|Move")
+	FVector GetCharacterFollowCameraForward(AHeroBuilderCharacter* InCharacter) const;
 
 private:
 	//状态进入/离开（仅服务端权威环境调用）
@@ -74,14 +73,8 @@ private:
 	//每角色推进
 	void TickCharacter(ACharacter* InCharacter, float DeltaTime);
 	void TickUpdateState(ACharacter* InCharacter, float DeltaTime);
-#if WITH_SERVER_CODE
-	//服务端权威：状态机推进（含SwitchState、Server_TryInteract等副作用）
-	void Tick_AuthorityState(ACharacter* InCharacter, float DeltaTime);
-#endif
-#if !UE_SERVER
 	//客户端本地：仅做视觉/预测处理，绝不触发权威逻辑
-	void Tick_LocalCosmetic(ACharacter* InCharacter, float DeltaTime);
-#endif
+	void TickCharacterState(ACharacter* InCharacter, float DeltaTime);
 
 	//移动到目标
 	void TickAuthorityMoveToTarget(ACharacter* InCharacter, float DeltaTime);

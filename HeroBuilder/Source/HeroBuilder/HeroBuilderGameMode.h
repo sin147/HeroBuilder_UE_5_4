@@ -17,7 +17,9 @@ class AHeroBuilderGameMode : public AGameModeBase
 	GENERATED_BODY()
 private:
 	// 仅服务端持有；客户端请通过 AHeroBuilderGameState::GetManager<T>() 获取。
+	UPROPERTY()
 	TArray<TObjectPtr<AHB_Base_Manager>> Managers;
+	UPROPERTY()
 	TArray<TObjectPtr<AHB_Base_Helper>> Helpers;
 public:
 	AHeroBuilderGameMode();

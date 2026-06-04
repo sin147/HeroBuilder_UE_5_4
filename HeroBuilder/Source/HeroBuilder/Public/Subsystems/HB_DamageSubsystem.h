@@ -7,11 +7,25 @@
 #include "HB_DamageSubsystem.generated.h"
 DECLARE_LOG_CATEGORY_EXTERN(LogDamageSubsystem, Log, All);
 
+USTRUCT()
 struct FDamageInfo
 {
-	AActor* Attacker;
-	float Damage;
-	AActor* Target;
+	GENERATED_BODY()
+
+	// 用 UPROPERTY + 反射容器(TArray)持有，GC 会将这里的引用视为强引用，
+	// 保证已入队的伤害一定能消费到（不会因为 Attacker/Target 中途被 GC 而沉默丢失）。
+	UPROPERTY()
+	TObjectPtr<AActor> Attacker = nullptr;
+
+	UPROPERTY()
+	float Damage = 0.f;
+
+	UPROPERTY()
+	TObjectPtr<AActor> Target = nullptr;
+
+	FDamageInfo() = default;
+	FDamageInfo(AActor* InAttacker, float InDamage, AActor* InTarget)
+		: Attacker(InAttacker), Damage(InDamage), Target(InTarget) {}
 };
 
 UENUM(BlueprintType)
@@ -32,7 +46,8 @@ class HEROBUILDER_API UHB_DamageSubsystem : public UHB_WorldSubsystem_Base
 	GENERATED_BODY()
 
 private:
-    TQueue<FDamageInfo> DamageQueue;
+	UPROPERTY()
+	TArray<FDamageInfo> DamageQueue;
 public:
 	UFUNCTION(BlueprintCallable)
     void TakeDamage(AActor* Attacker, float Damage, AActor* Target);

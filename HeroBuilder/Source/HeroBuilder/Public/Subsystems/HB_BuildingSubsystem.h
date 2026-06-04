@@ -25,6 +25,7 @@ public:
 	void Initialize(FSubsystemCollectionBase& Collection) override;
 private:
 	//建筑数据
+	UPROPERTY()
 	TObjectPtr<UBuildingData> BuildingData;
 
 	//待寻找目标的建筑

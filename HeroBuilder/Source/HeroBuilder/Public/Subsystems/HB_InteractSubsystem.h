@@ -22,9 +22,11 @@ class HEROBUILDER_API UHB_InteractSubsystem : public UHB_WorldSubsystem_Base
 {
 	GENERATED_BODY()
 private:
+	UPROPERTY()
 	TObjectPtr<UInteractData> InteractData;
 	//玩家控制器列表
-	TArray<APlayerController*> PlayerControllers;
+	UPROPERTY()
+	TArray<TObjectPtr<APlayerController>> PlayerControllers;
 
 	//交互检测距离
 	float InteractTraceDistance = 500.f;
@@ -70,4 +72,9 @@ public:
 	//获取交互动画
 	UFUNCTION(BlueprintCallable)
 	UAnimSequence* GetInteractAnim(EInteractMode InteractMode, EInteractType InteractType) const;
+	//获取玩家交互延迟
+	UFUNCTION(BlueprintCallable)
+	float GetPreInteractDelay(ACharacter* InCharacter) const;
+	UFUNCTION(BlueprintCallable)
+	float GetPostInteractDelay(ACharacter* InCharacter) const;
 };

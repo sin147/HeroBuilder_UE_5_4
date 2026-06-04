@@ -20,6 +20,7 @@ class HEROBUILDER_API UHB_ResourceSubsystem : public UHB_WorldSubsystem_Base
 	GENERATED_BODY()
 private:
 	//资源数据
+	UPROPERTY()
 	TObjectPtr<UResourceData> ResourceData;
 
 	//待生成的资源

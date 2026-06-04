@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Manager/HB_Base_Manager.h"
+#include "Net/Serialization/FastArraySerializer.h"
 #include "HB_CharacterManager.generated.h"
 
 class ACharacter;
@@ -24,7 +25,7 @@ enum EPlayerCharacterState :uint8
 
 //单条玩家角色状态数据（参与Replicate）
 USTRUCT()
-struct FCharacterStateEntry
+struct FCharacterStateEntry : public FFastArraySerializerItem
 {
 	GENERATED_BODY()
 public:
@@ -56,6 +57,30 @@ public:
 	UPROPERTY()
 	float InteractRange = 100.f;
 
+	void PreReplicatedRemove(const FFastArraySerializer& ArraySerializer);
+	void PostReplicatedAdd(const FFastArraySerializer& ArraySerializer);
+	void PostReplicatedChange(const FFastArraySerializer& ArraySerializer);
+};
+
+USTRUCT()
+struct FCharacterStateContainer : public FFastArraySerializer
+{
+	GENERATED_BODY()
+	UPROPERTY()
+	TArray<FCharacterStateEntry> CharacterStateEntries;
+	bool NetDeltaSerialize(FNetDeltaSerializeInfo& Parms)
+	{
+		return FastArrayDeltaSerialize<FCharacterStateEntry, FCharacterStateContainer>(CharacterStateEntries, Parms, *this);
+	}
+};
+// 关键：告诉 UE 这个结构体走 NetDeltaSerializer
+template<>
+struct TStructOpsTypeTraits<FCharacterStateContainer> : public TStructOpsTypeTraitsBase2<FCharacterStateContainer>
+{
+	enum
+	{
+		WithNetDeltaSerializer = true
+	};
 };
 
 /**
@@ -84,36 +109,19 @@ public:
 	AActor* GetInteractTarget(ACharacter* InCharacter) const;
 	void SetInteractTarget(ACharacter* InCharacter, AActor* Target);
 
-	float GetPreInteractDelay(ACharacter* InCharacter) const;
-	void SetPreInteractDelay(ACharacter* InCharacter, float Delay);
-
-	float GetPostInteractDelay(ACharacter* InCharacter) const;
-	void SetPostInteractDelay(ACharacter* InCharacter, float Delay);
-
 	float GetAttack(ACharacter* InCharacter) const;
 	void SetAttack(ACharacter* InCharacter, float NewAttack);
 
 	float GetInteractRange(ACharacter* InCharacter) const;
 	void SetInteractRange(ACharacter* InCharacter, float NewRange);
 
-	//—— 非同步运行期数据（仅服务端/客户端本地使用） ——
-	float GetCurrentInteractDelay(ACharacter* InCharacter) const;
-	void SetCurrentInteractDelay(ACharacter* InCharacter, float NewDelay);
-
-	bool GetInternalDrivenMove(ACharacter* InCharacter) const;
-	void SetInternalDrivenMove(ACharacter* InCharacter, bool bDriven);
-
 	//—— 遍历 ——
-	const TArray<FCharacterStateEntry>& GetAllEntries() const { return CharacterStateArray; }
+	const TArray<FCharacterStateEntry>& GetAllEntries() const { return CharacterStateContainer.CharacterStateEntries; }
 
 private:
 	//全玩家角色状态表（整张数组复制给所有客户端；UPROPERTY不支持复制TMap，故用TArray）
 	UPROPERTY(Replicated)
-	TArray<FCharacterStateEntry> CharacterStateArray;
-
-	//—— 非同步的每角色运行期数据 ——
-	//内部追击驱动标记（仅自治代理客户端使用）
-	TMap<TWeakObjectPtr<ACharacter>, bool> InternalDrivenMoveMap;
+	FCharacterStateContainer CharacterStateContainer;
 
 	//查表辅助
 	const FCharacterStateEntry* FindEntry(ACharacter* InCharacter) const;

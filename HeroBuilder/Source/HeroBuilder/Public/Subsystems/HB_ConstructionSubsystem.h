@@ -11,6 +11,16 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogConstructionSubsystem,Log,All)
 
 class AHB_Building_Base;
+USTRUCT()
+struct FPreBuildingInfo
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY()
+	TSubclassOf<AHB_Building_Base> BuildingClass;
+	UPROPERTY()
+	TObjectPtr<AStaticMeshActor> PreBuildingMeshActor;
+};
 
 /**
  * 
@@ -22,36 +32,20 @@ class HEROBUILDER_API UHB_ConstructionSubsystem : public UHB_WorldSubsystem_Base
 private:
 	float GridWidth=400;
 	float GridHeight=100;
+	UPROPERTY()
 	TObjectPtr<UConstructionData> ConstructionData;
-	TMap<TObjectPtr<ACharacter>,TObjectPtr<APreviewBuildingActor>> PreBuildingMeshActorMap;
-	TMap<TObjectPtr<ACharacter>, TSubclassOf<AHB_Building_Base>> BuildingClassMap;
-	ENetMode NetMode;
+	UPROPERTY()
+	TMap<TObjectPtr<ACharacter>, FPreBuildingInfo> BuildingClassMap;
 	void TickPreviewBuildingPos();
 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void PostInitialize() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { return TStatId(); }
-	void Client_SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
-    void Server_SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
+    void SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
 	void ConstructionBegin(ACharacter* InCharacter);
 	bool CheckCanConstruction(ACharacter* InCharacter);
-	void Client_ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
-	void Server_ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
-	void Client_CancelConstructionMode(TObjectPtr<ACharacter>InCharacter);
-	void Server_CancelConstructionMode(TObjectPtr<ACharacter>InCharacter);
-};
-UCLASS()
-class APreviewBuildingActor : public AStaticMeshActor
-{
-	GENERATED_BODY()
-private:
-	UPROPERTY(ReplicatedUsing = OnRep_Mesh)
-	UStaticMesh* ReplicatedMesh;
-	UFUNCTION()
-	void OnRep_Mesh();
-public:
-	APreviewBuildingActor();
-	void SetMesh(UStaticMesh* InMesh);
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	void ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
+	void CancelConstructionMode(TObjectPtr<ACharacter>InCharacter);
 };

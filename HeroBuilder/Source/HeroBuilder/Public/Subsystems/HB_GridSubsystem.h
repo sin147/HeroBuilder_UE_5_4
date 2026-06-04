@@ -19,6 +19,7 @@ class HEROBUILDER_API UHB_GridSubsystem : public UHB_WorldSubsystem_Base
 {
 	GENERATED_BODY()
 private:
+	UPROPERTY()
 	TObjectPtr<UGridData> GridData;
 	void OnSpawnBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);
 	void OnDestroyBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);

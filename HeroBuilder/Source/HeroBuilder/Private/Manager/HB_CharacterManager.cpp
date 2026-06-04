@@ -5,6 +5,20 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
 
+//—— FCharacterStateEntry 的 FastArray 回调（客户端在收到 增/删/改 时被调用） ——
+//目前不需要在客户端做额外处理，给空实现即可；后续如果需要 UI 刷新等本地反馈再在这里补
+void FCharacterStateEntry::PreReplicatedRemove(const FFastArraySerializer& /*ArraySerializer*/)
+{
+}
+
+void FCharacterStateEntry::PostReplicatedAdd(const FFastArraySerializer& /*ArraySerializer*/)
+{
+}
+
+void FCharacterStateEntry::PostReplicatedChange(const FFastArraySerializer& /*ArraySerializer*/)
+{
+}
+
 AHB_CharacterManager::AHB_CharacterManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -15,7 +29,7 @@ AHB_CharacterManager::AHB_CharacterManager()
 void AHB_CharacterManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AHB_CharacterManager, CharacterStateArray);
+	DOREPLIFETIME(AHB_CharacterManager, CharacterStateContainer);
 }
 
 const FCharacterStateEntry* AHB_CharacterManager::FindEntry(ACharacter* InCharacter) const
@@ -24,7 +38,7 @@ const FCharacterStateEntry* AHB_CharacterManager::FindEntry(ACharacter* InCharac
 	{
 		return nullptr;
 	}
-	for (const FCharacterStateEntry& Entry : CharacterStateArray)
+	for (const FCharacterStateEntry& Entry : CharacterStateContainer.CharacterStateEntries)
 	{
 		if (Entry.Character == InCharacter)
 		{
@@ -40,7 +54,7 @@ FCharacterStateEntry* AHB_CharacterManager::FindEntryMutable(ACharacter* InChara
 	{
 		return nullptr;
 	}
-	for (FCharacterStateEntry& Entry : CharacterStateArray)
+	for (FCharacterStateEntry& Entry : CharacterStateContainer.CharacterStateEntries)
 	{
 		if (Entry.Character == InCharacter)
 		{
@@ -52,7 +66,7 @@ FCharacterStateEntry* AHB_CharacterManager::FindEntryMutable(ACharacter* InChara
 
 FCharacterStateEntry& AHB_CharacterManager::FindOrAddEntry(ACharacter* InCharacter)
 {
-	for (FCharacterStateEntry& Entry : CharacterStateArray)
+	for (FCharacterStateEntry& Entry : CharacterStateContainer.CharacterStateEntries)
 	{
 		if (Entry.Character == InCharacter)
 		{
@@ -61,8 +75,11 @@ FCharacterStateEntry& AHB_CharacterManager::FindOrAddEntry(ACharacter* InCharact
 	}
 	FCharacterStateEntry NewEntry;
 	NewEntry.Character = InCharacter;
-	const int32 Idx = CharacterStateArray.Add(NewEntry);
-	return CharacterStateArray[Idx];
+    const int32 Idx = CharacterStateContainer.CharacterStateEntries.Add(NewEntry);
+	FCharacterStateEntry& AddedRef = CharacterStateContainer.CharacterStateEntries[Idx];
+	//FastArray新增必须手动标脏，否则OldMap不会同步、下次序列化会告警或丢包
+	CharacterStateContainer.MarkItemDirty(AddedRef);
+	return AddedRef;
 }
 
 void AHB_CharacterManager::RegisterCharacter(ACharacter* InCharacter)
@@ -80,11 +97,15 @@ void AHB_CharacterManager::RemoveEntry(ACharacter* InCharacter)
 	{
 		return;
 	}
-	CharacterStateArray.RemoveAll([InCharacter](const FCharacterStateEntry& Entry)
+	const int32 Removed = CharacterStateContainer.CharacterStateEntries.RemoveAll([InCharacter](const FCharacterStateEntry& Entry)
 	{
 		return Entry.Character == InCharacter;
 	});
-	InternalDrivenMoveMap.Remove(InCharacter);
+	if (Removed > 0)
+	{
+		//FastArray删除必须调用MarkArrayDirty，重建内部ItemMap
+		CharacterStateContainer.MarkArrayDirty();
+	}
 }
 
 //—— 同步属性访问 ——
@@ -103,7 +124,13 @@ void AHB_CharacterManager::SetCurrentlyState(ACharacter* InCharacter, EPlayerCha
 	{
 		return;
 	}
-	FindOrAddEntry(InCharacter).CurrentlyState = NewState;
+	FCharacterStateEntry& Entry = FindOrAddEntry(InCharacter);
+	if (Entry.CurrentlyState == NewState)
+	{
+		return;
+	}
+	Entry.CurrentlyState = NewState;
+	CharacterStateContainer.MarkItemDirty(Entry);
 }
 
 AActor* AHB_CharacterManager::GetInteractTarget(ACharacter* InCharacter) const
@@ -121,43 +148,13 @@ void AHB_CharacterManager::SetInteractTarget(ACharacter* InCharacter, AActor* Ta
 	{
 		return;
 	}
-	FindOrAddEntry(InCharacter).InteractTarget = Target;
-}
-
-float AHB_CharacterManager::GetPreInteractDelay(ACharacter* InCharacter) const
-{
-	if (const FCharacterStateEntry* Entry = FindEntry(InCharacter))
-	{
-		return Entry->PreInteractDelay;
-	}
-	return 0.3f;
-}
-
-void AHB_CharacterManager::SetPreInteractDelay(ACharacter* InCharacter, float Delay)
-{
-	if (!IsValid(InCharacter))
+	FCharacterStateEntry& Entry = FindOrAddEntry(InCharacter);
+	if (Entry.InteractTarget == Target)
 	{
 		return;
 	}
-	FindOrAddEntry(InCharacter).PreInteractDelay = Delay;
-}
-
-float AHB_CharacterManager::GetPostInteractDelay(ACharacter* InCharacter) const
-{
-	if (const FCharacterStateEntry* Entry = FindEntry(InCharacter))
-	{
-		return Entry->PostInteractDelay;
-	}
-	return 0.3f;
-}
-
-void AHB_CharacterManager::SetPostInteractDelay(ACharacter* InCharacter, float Delay)
-{
-	if (!IsValid(InCharacter))
-	{
-		return;
-	}
-	FindOrAddEntry(InCharacter).PostInteractDelay = Delay;
+	Entry.InteractTarget = Target;
+	CharacterStateContainer.MarkItemDirty(Entry);
 }
 
 float AHB_CharacterManager::GetAttack(ACharacter* InCharacter) const
@@ -175,7 +172,13 @@ void AHB_CharacterManager::SetAttack(ACharacter* InCharacter, float NewAttack)
 	{
 		return;
 	}
-	FindOrAddEntry(InCharacter).Attack = NewAttack;
+	FCharacterStateEntry& Entry = FindOrAddEntry(InCharacter);
+	if (Entry.Attack == NewAttack)
+	{
+		return;
+	}
+	Entry.Attack = NewAttack;
+	CharacterStateContainer.MarkItemDirty(Entry);
 }
 
 float AHB_CharacterManager::GetInteractRange(ACharacter* InCharacter) const
@@ -193,46 +196,11 @@ void AHB_CharacterManager::SetInteractRange(ACharacter* InCharacter, float NewRa
 	{
 		return;
 	}
-	FindOrAddEntry(InCharacter).InteractRange = NewRange;
-}
-
-//—— 非同步运行期数据 ——
-float AHB_CharacterManager::GetCurrentInteractDelay(ACharacter* InCharacter) const
-{
-	if (const FCharacterStateEntry* Entry = FindEntry(InCharacter))
-	{
-		return Entry->CurrentInteractDelay;
-	}
-	return 0.f;
-}
-
-void AHB_CharacterManager::SetCurrentInteractDelay(ACharacter* InCharacter, float NewDelay)
-{
-	if (!IsValid(InCharacter))
+	FCharacterStateEntry& Entry = FindOrAddEntry(InCharacter);
+	if (Entry.InteractRange == NewRange)
 	{
 		return;
 	}
-	FindOrAddEntry(InCharacter).CurrentInteractDelay = NewDelay;
-}
-
-bool AHB_CharacterManager::GetInternalDrivenMove(ACharacter* InCharacter) const
-{
-	if (!IsValid(InCharacter))
-	{
-		return false;
-	}
-	if (const bool* Found = InternalDrivenMoveMap.Find(InCharacter))
-	{
-		return *Found;
-	}
-	return false;
-}
-
-void AHB_CharacterManager::SetInternalDrivenMove(ACharacter* InCharacter, bool bDriven)
-{
-	if (!IsValid(InCharacter))
-	{
-		return;
-	}
-	InternalDrivenMoveMap.Add(InCharacter, bDriven);
+	Entry.InteractRange = NewRange;
+	CharacterStateContainer.MarkItemDirty(Entry);
 }

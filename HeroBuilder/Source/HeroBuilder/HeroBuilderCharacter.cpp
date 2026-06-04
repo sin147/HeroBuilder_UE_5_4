@@ -124,22 +124,6 @@ void AHeroBuilderCharacter::SetAttack(float NewAttack)
 	}
 }
 
-void AHeroBuilderCharacter::SetPreInteractDelay(float Delay)
-{
-	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-	{
-		Sys->SetPreInteractDelay(this, Delay);
-	}
-}
-
-void AHeroBuilderCharacter::SetPostInteractDelay(float Delay)
-{
-	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-	{
-		Sys->SetPostInteractDelay(this, Delay);
-	}
-}
-
 //——————————————————————————————————————————————
 // 生命周期
 //——————————————————————————————————————————————
@@ -147,19 +131,6 @@ void AHeroBuilderCharacter::SetPostInteractDelay(float Delay)
 void AHeroBuilderCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
-	//服务端：注册到CharacterSubsystem，写入初始属性到Manager表项
-	if (HasAuthority())
-	{
-		if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-		{
-			Sys->RegisterCharacter(this);
-			Sys->SetAttack(this, InitAttack);
-			Sys->SetInteractRange(this, InitInteractRange);
-			Sys->SetPreInteractDelay(this, InitPreInteractDelay);
-			Sys->SetPostInteractDelay(this, InitPostInteractDelay);
-		}
-	}
 }
 
 void AHeroBuilderCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -180,13 +151,24 @@ void AHeroBuilderCharacter::Tick(float DeltaTime)
 	//所有状态机Tick逻辑已迁至UHB_CharacterSubsystem::Tick；此处不再做任何处理
 }
 
-FVector AHeroBuilderCharacter::GetFollowCameraForward()
-{
-	return FollowCamera->GetForwardVector();
-}
-
 //////////////////////////////////////////////////////////////////////////
 // Input
+
+void AHeroBuilderCharacter::Client_BeginInteract_Implementation()
+{
+	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
+	{
+		Sys->BeginInteractFlow(this);
+	}
+}
+
+void AHeroBuilderCharacter::Client_AbortInteract_Implementation()
+{
+	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
+	{
+		Sys->AbortInteract(this);
+	}
+}
 
 void AHeroBuilderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -216,7 +198,7 @@ void AHeroBuilderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 		EnhancedInputComponent->BindAction(ChangeConstructionModeAction, ETriggerEvent::Started, this, &AHeroBuilderCharacter::ChangeConstructionMode);
 
 		// Interact：长按保持交互，抬起取消
-		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AHeroBuilderCharacter::Interact);
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AHeroBuilderCharacter::OnInteractPressed);
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &AHeroBuilderCharacter::OnInteractReleased);
 	}
 	else
@@ -230,7 +212,7 @@ void AHeroBuilderCharacter::Move(const FInputActionValue& Value)
 	//交互优先：只要交互流程进行中（追击/前摇/交互/后摇），就禁止一切玩家移动输入；
 	//但客户端追击逻辑(Subsystem::TickMoveToTarget)会设置bInternalDrivenMove=true主动调用本函数驱动移动，需要放行
 	UHB_CharacterSubsystem* Sys = GetCharacterSubsystem();
-	if (Sys && !Sys->IsInternalDrivenMove(this))
+	if (Sys)
 	{
 		const EPlayerCharacterState State = Sys->GetCurrentState(this);
 		if (State == EPCS_MoveToTarget ||
@@ -278,24 +260,65 @@ void AHeroBuilderCharacter::Look(const FInputActionValue& Value)
 
 void AHeroBuilderCharacter::ChangeConstructionMode(const FInputActionValue& Value)
 {
-	UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>();
+	ENetMode NetMode = GetNetMode();
+	if (NetMode == NM_Client || NetMode == NM_DedicatedServer)
+	{
+        Server_ChangeConstructionMode();
+		Client_ChangeConstructionMode();
+	}
+	else
+	{
+		//单机/Listen Server宿主：本地直接走切换逻辑
+		if (UWorld* World = GetWorld())
+		{
+			if (UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>())
+			{
+				const EInteractMode CurMode = InteractSys->GetInteractMode(this);
+				const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
+				InteractSys->SwitchInteractMode(this, NewMode);
+			}
+		}
+	}
+}
+
+void AHeroBuilderCharacter::Server_ChangeConstructionMode_Implementation()
+{
+	//服务端权威切换：在 Normal 与 Construction 之间互切
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>();
 	if (!InteractSys)
 	{
 		return;
 	}
-	const EInteractMode Cur = InteractSys->GetInteractMode(this);
-	const EInteractMode Next = (Cur == IM_Construction) ? IM_Normal : IM_Construction;
-	if (HasAuthority())
-	{
-		InteractSys->SwitchInteractMode(this, Next);
-	}
-	else
-	{
-		Server_SwitchInteractMode((uint8)Next);
-	}
+	const EInteractMode CurMode = InteractSys->GetInteractMode(this);
+	const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
+	InteractSys->SwitchInteractMode(this, NewMode);
 }
 
-void AHeroBuilderCharacter::Interact(const FInputActionValue& Value)
+void AHeroBuilderCharacter::Client_ChangeConstructionMode_Implementation()
+{
+	//客户端本地反馈：真正的模式切换由服务端权威驱动（Manager 的字段会通过复制下发到客户端），
+	//这里只做客户端侧的就近响应（例如埋点/UI刷新hook），保持与 Client_BeginInteract 风格一致。
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>();
+	if (!InteractSys)
+	{
+		return;
+	}
+	const EInteractMode CurMode = InteractSys->GetInteractMode(this);
+	const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
+	InteractSys->SwitchInteractMode(this, NewMode);
+}
+
+void AHeroBuilderCharacter::OnInteractPressed(const FInputActionValue& Value)
 {
 	UHB_CharacterSubsystem* Sys = GetCharacterSubsystem();
 	if (!Sys)
@@ -308,13 +331,15 @@ void AHeroBuilderCharacter::Interact(const FInputActionValue& Value)
 	{
 		return;
 	}
-	if (HasAuthority())
+	if (GetNetMode() == NM_Client || GetNetMode() == NM_DedicatedServer)
 	{
-		Sys->BeginInteractFlow(this);
+
+		Client_BeginInteract();
+		Server_BeginInteract();
 	}
 	else
 	{
-		Server_BeginInteract();
+		Sys->BeginInteractFlow(this);
 	}
 }
 
@@ -343,39 +368,17 @@ void AHeroBuilderCharacter::Server_AbortInteract_Implementation()
 
 void AHeroBuilderCharacter::OnInteractReleased(const FInputActionValue& Value)
 {
-	if (HasAuthority())
+	ENetMode NetMode = GetNetMode();
+	if (NetMode == NM_Client || NetMode == NM_DedicatedServer)
+	{
+		Server_AbortInteract();
+		Client_AbortInteract();
+	}
+	else
 	{
 		if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
 		{
 			Sys->AbortInteract(this);
 		}
-	}
-	else
-	{
-		Server_AbortInteract();
-	}
-}
-
-void AHeroBuilderCharacter::Server_SwitchInteractMode_Implementation(uint8 NewMode)
-{
-	if (UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>())
-	{
-		InteractSys->SwitchInteractMode(this, static_cast<EInteractMode>(NewMode));
-	}
-}
-
-void AHeroBuilderCharacter::Server_SwitchInteractType_Implementation(uint8 NewMode)
-{
-	if (UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>())
-	{
-		InteractSys->SwitchInteractType(this, static_cast<EInteractType>(NewMode));
-	}
-}
-
-void AHeroBuilderCharacter::Server_TryInteract_Implementation()
-{
-	if (UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>())
-	{
-		InteractSys->TryInteract(this);
 	}
 }

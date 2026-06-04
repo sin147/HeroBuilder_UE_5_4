@@ -50,7 +50,7 @@ void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 int32 UHB_GridSubsystem::GetGridWidth() const
 {
     int32 Ret = 0;
-	if (GridData)
+	if (IsValid(GridData))
 	{
         Ret = GridData->GetGridWidth();
     }
@@ -64,7 +64,7 @@ int32 UHB_GridSubsystem::GetGridWidth() const
 int32 UHB_GridSubsystem::GetGridHeight() const
 {
     int32 Ret = 0;
-    if (GridData)
+    if (IsValid(GridData))
     {
         Ret = GridData->GetGridHeight();
     }

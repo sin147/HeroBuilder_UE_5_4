@@ -35,6 +35,7 @@ protected:
 	void WaveTick(float DeltaTime);
 	void AddSpawnPoint(AHB_SpawnPoint_Enemy* SpawnPoint);
 private:
+	UPROPERTY()
 	TObjectPtr<UWaveData> WaveData;
 	TEnumAsByte<EWaveState> WaveState;
 	int32 CurrentlyWaveIndex;
@@ -42,6 +43,7 @@ private:
 	float RemainingPreparatoryTime;
 	TArray<FWaveEnemyConfig> CurrentlyWaveEnemyConfigs;
 	FWaveConfig CurrentlyWaveConfig;
+	UPROPERTY()
 	TArray<TObjectPtr<AHB_SpawnPoint_Enemy>> SpawnPoints;
 	bool bAutoNextWave;
 	AHB_SpawnPoint_Enemy* GetAnRandSpawnPoint();

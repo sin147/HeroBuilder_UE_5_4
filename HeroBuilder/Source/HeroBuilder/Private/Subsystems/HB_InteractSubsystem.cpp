@@ -229,12 +229,6 @@ void UHB_InteractSubsystem::EnterInteractType(ACharacter* InCharacter, EInteract
 	default:
 		break;
 	}
-	if (InteractData)
-	{
-		const EInteractMode CurMode = GetInteractMode(HeroBuilderCharacter);
-		HeroBuilderCharacter->SetPreInteractDelay(InteractData->GetPreInteractDelay(CurMode, EnterMode));
-		HeroBuilderCharacter->SetPostInteractDelay(InteractData->GetPostInteractDelay(CurMode, EnterMode));
-	}
 	if (AHB_InteractManager* InteractMgr = GetInteractManager())
 	{
 		InteractMgr->SetCurrentInteractType(HeroBuilderCharacter, EnterMode);
@@ -344,11 +338,6 @@ void UHB_InteractSubsystem::SwitchInteractMode(ACharacter* InCharacter, EInterac
 	{
 		return;
 	}
-	//模式即将切换：先中止角色当前正在进行的交互流程，避免旧动作/旧目标残留到新模式
-	if (UHB_CharacterSubsystem* CharSys = GetWorld()->GetSubsystem<UHB_CharacterSubsystem>())
-	{
-		CharSys->AbortInteract(InCharacter);
-	}
 	LeaveInteractMode(InCharacter, CurrentMode);
 	EnterInteractMode(InCharacter, NewMode);
 }
@@ -371,7 +360,7 @@ void UHB_InteractSubsystem::EnterInteractMode(ACharacter* InCharacter, EInteract
 	case IM_Construction:
 		if (UHB_ConstructionSubsystem* ConstructionSys = GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>())
 		{
-			ConstructionSys->Server_ActiveConstructionMode(HBCharacter);
+			ConstructionSys->ActiveConstructionMode(HBCharacter);
 		}
 		break;
 	default:
@@ -403,7 +392,7 @@ void UHB_InteractSubsystem::LeaveInteractMode(ACharacter* InCharacter, EInteract
 	case IM_Construction:
 		if (UHB_ConstructionSubsystem* ConstructionSys = GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>())
 		{
-			ConstructionSys->Server_CancelConstructionMode(HBCharacter);
+			ConstructionSys->CancelConstructionMode(HBCharacter);
 		}
 		break;
 	default:
@@ -525,4 +514,14 @@ UAnimSequence* UHB_InteractSubsystem::GetInteractAnim(EInteractMode InteractMode
 		return nullptr;
 	}
     return InteractData->GetInteractAnimation(InteractMode, InteractType);
+}
+
+float UHB_InteractSubsystem::GetPreInteractDelay(ACharacter* InCharacter) const
+{
+	return InteractData->GetPreInteractDelay(GetInteractMode(InCharacter), GetInteractType(InCharacter));
+}
+
+float UHB_InteractSubsystem::GetPostInteractDelay(ACharacter* InCharacter) const
+{
+	return InteractData->GetPostInteractDelay(GetInteractMode(InCharacter), GetInteractType(InCharacter));
 }

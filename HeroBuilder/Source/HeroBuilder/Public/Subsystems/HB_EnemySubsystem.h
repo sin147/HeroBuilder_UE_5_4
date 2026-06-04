@@ -22,6 +22,7 @@ class HEROBUILDER_API UHB_EnemySubsystem : public UHB_WorldSubsystem_Base
 	GENERATED_BODY()
 private:
 	//敌人数据
+	UPROPERTY()
 	TObjectPtr<UEnemyData> EnemyData;
 	
 	//待寻找目标的敌人

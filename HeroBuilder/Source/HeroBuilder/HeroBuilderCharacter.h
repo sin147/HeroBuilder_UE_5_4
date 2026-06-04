@@ -23,7 +23,7 @@ UCLASS(config=Game)
 class AHeroBuilderCharacter : public ACharacter
 {
 	GENERATED_BODY()
-
+	friend class UHB_CharacterSubsystem;
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
@@ -54,16 +54,6 @@ class AHeroBuilderCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* InteractAction;
 
-	//角色初始化数值（仅服务端BeginPlay写入Manager表项；运行期数据以Manager为准）
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats", meta = (AllowPrivateAccess = "true"))
-	float InitAttack = 10.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats", meta = (AllowPrivateAccess = "true"))
-	float InitInteractRange = 100.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Interact, meta = (AllowPrivateAccess = "true"))
-	float InitPreInteractDelay = 0.3f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Interact, meta = (AllowPrivateAccess = "true"))
-	float InitPostInteractDelay = 0.3f;
-
 	UFUNCTION(Server,Reliable)
 	void Server_Attack();
 
@@ -81,9 +71,6 @@ public:
 	float GetAttack() const;
 	void SetAttack(float NewAttack);
 
-	void SetPreInteractDelay(float Delay);
-	void SetPostInteractDelay(float Delay);
-
 	//Move对外暴露（Subsystem的TickMoveToTarget会调用）
 	void Move(const FInputActionValue& Value);
 
@@ -93,27 +80,28 @@ protected:
 	void Look(const FInputActionValue& Value);
 			
 	void ChangeConstructionMode(const FInputActionValue& Value);
-
-	void Interact(const FInputActionValue& Value);
-	//交互键抬起：负责路由到服务端中止交互流程
-	void OnInteractReleased(const FInputActionValue& Value);
-
-	//请求服务端切换交互模式
+	//请求服务端切换建造模式（在 IM_Normal 与 IM_Construction 之间切换）
 	UFUNCTION(Server, Reliable)
-	void Server_SwitchInteractMode(uint8 NewMode);
-
-	//请求服务端切换交互类型
-	UFUNCTION(Server, Reliable)
-	void Server_SwitchInteractType(uint8 NewMode);
-	//请求服务端触发交互
-	UFUNCTION(Server, Reliable)
-	void Server_TryInteract();
+	void Server_ChangeConstructionMode();
+	//通知 Owning Client 切换建造模式（客户端本地反馈/状态刷新）
+	UFUNCTION(Client, Reliable)
+	void Client_ChangeConstructionMode();
+	/******************************************************/
+	void OnInteractPressed(const FInputActionValue& Value);
 	//请求服务端开启一次交互流程（按下交互键时由客户端发起）
 	UFUNCTION(Server, Reliable)
 	void Server_BeginInteract();
+	UFUNCTION(Client, Reliable)
+	void Client_BeginInteract();
+	//交互键抬起：负责路由到服务端中止交互流程
+	void OnInteractReleased(const FInputActionValue& Value);
 	//请求服务端中止当前交互流程（抬起交互键时由客户端发起）
 	UFUNCTION(Server, Reliable)
 	void Server_AbortInteract();
+	UFUNCTION(Client, Reliable)
+	void Client_AbortInteract();
+	/******************************************************/
+
 
 protected:
 	// APawn interface
@@ -123,13 +111,6 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaTime) override;
-
-public:
-	/** Returns CameraBoom subobject **/
-	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
-	/** Returns FollowCamera subobject **/
-	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-	FVector GetFollowCameraForward();
 
 private:
 	UHB_CharacterSubsystem* GetCharacterSubsystem() const;

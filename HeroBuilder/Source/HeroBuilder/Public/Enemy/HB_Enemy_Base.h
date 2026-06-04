@@ -53,6 +53,7 @@ private:
 	TObjectPtr<AActor> Target;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
     TSubclassOf<AActor> TargetClass;
+	UPROPERTY()
 	TObjectPtr<AAIController> AIController;
 	FTimerHandle DeathTimer;
 	ENetMode NetMode;
