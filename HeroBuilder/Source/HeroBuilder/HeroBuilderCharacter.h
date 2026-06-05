@@ -60,13 +60,6 @@ class AHeroBuilderCharacter : public ACharacter
 public:
 	AHeroBuilderCharacter();
 
-	//——状态/属性访问壳：内部转调UHB_CharacterSubsystem，保持外部Caller接口不破——
-	UFUNCTION(BlueprintPure)
-	TEnumAsByte<EPlayerCharacterState> GetCurrentState() const;
-
-	void SetInteractTarget(AActor* Target);
-	AActor* GetInteractTarget() const;
-
 	UFUNCTION(BlueprintPure, Category = "Stats")
 	float GetAttack() const;
 	void SetAttack(float NewAttack);
@@ -75,7 +68,7 @@ public:
 	void Move(const FInputActionValue& Value);
 
 protected:
-
+	bool CanMove();
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 			
@@ -93,6 +86,8 @@ protected:
 	void Server_BeginInteract();
 	UFUNCTION(Client, Reliable)
 	void Client_BeginInteract();
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_BeginInteract();
 	//交互键抬起：负责路由到服务端中止交互流程
 	void OnInteractReleased(const FInputActionValue& Value);
 	//请求服务端中止当前交互流程（抬起交互键时由客户端发起）
@@ -100,6 +95,8 @@ protected:
 	void Server_AbortInteract();
 	UFUNCTION(Client, Reliable)
 	void Client_AbortInteract();
+	UFUNCTION(NetMulticast, Reliable)
+    void Multicast_AbortInteract();
 	/******************************************************/
 
 
@@ -109,7 +106,6 @@ protected:
 	
 	// To add mapping context
 	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaTime) override;
 
 private:

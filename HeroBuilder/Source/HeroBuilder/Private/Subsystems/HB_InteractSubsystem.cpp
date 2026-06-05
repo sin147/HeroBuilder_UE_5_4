@@ -93,15 +93,14 @@ void UHB_InteractSubsystem::TickUpdateInteractTarget(float DeltaTime)
 			continue;
 		}
 		const EInteractType CurrentMode = InteractMgr->GetCurrentInteractType(HBCharacter);
-
 		// 找到了有效目标 -> 设为 InteractTarget；否则清空。
 		if (NewNearest)
 		{
-			HBCharacter->SetInteractTarget(NewNearest);
+			InteractMgr->SetInteractTarget(HBCharacter, NewNearest);
 		}
 		else
 		{
-			HBCharacter->SetInteractTarget(nullptr);
+			InteractMgr->SetInteractTarget(HBCharacter, nullptr);
 		}
 
 		// 同步当前角色的 InteractType（无有效目标 -> 回落到 IT_Normal）
@@ -163,6 +162,23 @@ AHB_InteractManager* UHB_InteractSubsystem::GetInteractManager()
 	//统一走基类通道：服务端读 GameMode 的 Manager 列表，客户端读 GameState 上已复制的 Manager 列表。
 	//Manager 的创建交给 AHeroBuilderGameMode::StartPlay 统一 Spawn，子系统不再自行 Spawn。
 	return GetManager<AHB_InteractManager>();
+}
+
+AActor* UHB_InteractSubsystem::GetInteractTarget(ACharacter* InCharacter) const
+{
+	if (AHB_InteractManager* InteractMgr = const_cast<UHB_InteractSubsystem*>(this)->GetInteractManager())
+	{
+		return InteractMgr->GetInteractTarget(InCharacter);
+	}
+	return nullptr;
+}
+
+void UHB_InteractSubsystem::SetInteractTarget(ACharacter* InCharacter, AActor* Target)
+{
+	if (AHB_InteractManager* InteractMgr = GetInteractManager())
+	{
+		InteractMgr->SetInteractTarget(InCharacter, Target);
+	}
 }
 
 void UHB_InteractSubsystem::SwitchInteractType(ACharacter* InCharacter, EInteractType NewMode)
@@ -437,7 +453,7 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 		{
 			return;
 		}
-		AActor* Target = HBCharacter->GetInteractTarget();
+		AActor* Target = GetInteractTarget(InCharacter);
 		if (!IsValid(Target))
 		{
 			return;
@@ -472,7 +488,7 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 			{
 				break;
 			}
-			AHB_Building_Base* TargetBuilding = Cast<AHB_Building_Base>(HBCharacter->GetInteractTarget());
+			AHB_Building_Base* TargetBuilding = Cast<AHB_Building_Base>(GetInteractTarget(InCharacter));
 			if (TargetBuilding && TargetBuilding->IsAwaitingConstruction())
 			{
 				const float HealAmount = HBCharacter->GetAttack();

@@ -42,6 +42,11 @@ public:
 	//获取单例 InteractManager：统一走基类 GetManager<T>()，服务端读 GameMode、客户端读已复制的 GameState
 	AHB_InteractManager* GetInteractManager();
 
+	//—— 交互目标（透传Manager） ——
+	UFUNCTION(BlueprintCallable, Category = "Interact")
+	AActor* GetInteractTarget(ACharacter* InCharacter) const;
+	void SetInteractTarget(ACharacter* InCharacter, AActor* Target);
+
 	//切换玩家交互模式
 	void SwitchInteractType(ACharacter* InCharacter, EInteractType NewMode);
 	//进入交互模式

@@ -8,6 +8,7 @@
 #include "HB_InteractManager.generated.h"
 
 class ACharacter;
+class AActor;
 
 //EInteractManagerInteractMode 的定义已迁移至 Config/InteractData.h，避免循环依赖
 
@@ -26,6 +27,10 @@ public:
 
 	UPROPERTY()
 	TEnumAsByte<EInteractMode> InteractMode = IM_Normal;
+
+	//当前最近的交互目标（由InteractSubsystem周期性更新）
+	UPROPERTY()
+	TObjectPtr<AActor> InteractTarget = nullptr;
 };
 
 /**
@@ -49,6 +54,10 @@ public:
 	//—— 交互模式（建造/正常） ——
 	EInteractMode GetCurrentInteractMode(ACharacter* InCharacter) const;
 	void SetCurrentInteractMode(ACharacter* InCharacter, EInteractMode NewMode);
+
+	//—— 交互目标（服务端权威） ——
+	AActor* GetInteractTarget(ACharacter* InCharacter) const;
+	void SetInteractTarget(ACharacter* InCharacter, AActor* Target);
 
 	//玩家登出时清理表项（仅服务端调用）
 	void RemoveEntry(ACharacter* InCharacter);

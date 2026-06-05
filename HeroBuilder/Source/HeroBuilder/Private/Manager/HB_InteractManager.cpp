@@ -95,6 +95,47 @@ void AHB_InteractManager::SetCurrentInteractMode(ACharacter* InCharacter, EInter
 	CharacterInteractArray.Add(NewEntry);
 }
 
+AActor* AHB_InteractManager::GetInteractTarget(ACharacter* InCharacter) const
+{
+	if (!IsValid(InCharacter))
+	{
+		return nullptr;
+	}
+	for (const FInteractEntry& Entry : CharacterInteractArray)
+	{
+		if (Entry.Character == InCharacter)
+		{
+			return Entry.InteractTarget;
+		}
+	}
+	return nullptr;
+}
+
+void AHB_InteractManager::SetInteractTarget(ACharacter* InCharacter, AActor* Target)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	for (FInteractEntry& Entry : CharacterInteractArray)
+	{
+		if (Entry.Character == InCharacter)
+		{
+			if (Entry.InteractTarget == Target)
+			{
+				return;
+			}
+			Entry.InteractTarget = Target;
+			return;
+		}
+	}
+	//未找到则新增一项
+	FInteractEntry NewEntry;
+	NewEntry.Character = InCharacter;
+	NewEntry.InteractTarget = Target;
+	CharacterInteractArray.Add(NewEntry);
+}
+
 void AHB_InteractManager::RemoveEntry(ACharacter* InCharacter)
 {
 	if (!InCharacter)

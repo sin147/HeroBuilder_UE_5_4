@@ -41,10 +41,7 @@ void UHB_ConstructionSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	// 预览模型仅在有显示画面的端 Tick（DedicatedServer 不需要）
-	if (NetMode != NM_DedicatedServer)
-	{
-		TickPreviewBuildingPos();
-	}
+	TickPreviewBuildingPos();
 }
 
 void UHB_ConstructionSubsystem::SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass)
@@ -78,19 +75,14 @@ void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
 	{
 		return;
 	}
-
-	FPreBuildingInfo* PreBuildingInfo = BuildingClassMap.Find(InCharacter);
-	if (!PreBuildingInfo || !IsValid(PreBuildingInfo->PreBuildingMeshActor) || !IsValid(PreBuildingInfo->BuildingClass))
-	{
-		return;
-	}
-
 	if (CheckCanConstruction(InCharacter))
 	{
+		FPreBuildingInfo* PreBuildingInfo = BuildingClassMap.Find(InCharacter);
 		AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingInfo->PreBuildingMeshActor;
 		GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuilding(
 			PreBuildingInfo->BuildingClass,
 			FTransform(TargetPreStaticMeshActor->GetActorRotation(), TargetPreStaticMeshActor->GetActorLocation(), TargetPreStaticMeshActor->GetActorScale()));
+		UE_LOG(LogConstructionSubsystem, Log, TEXT("ConstructionBegin: spawn building"));
 	}
 }
 
@@ -99,12 +91,6 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 	if (!IsValid(InCharacter) || !IsValid(ConstructionData))
 	{
 		UE_LOG(LogConstructionSubsystem, Warning, TEXT("ActiveConstructionMode: invalid parameters or ConstructionData"));
-		return;
-	}
-
-	// DedicatedServer 不需要预览模型
-	if (NetMode == NM_DedicatedServer)
-	{
 		return;
 	}
 

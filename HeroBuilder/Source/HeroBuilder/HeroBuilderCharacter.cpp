@@ -77,36 +77,6 @@ AHeroBuilderCharacter::AHeroBuilderCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 }
 
-//——————————————————————————————————————————————
-// 状态/属性访问壳：转调Subsystem
-//——————————————————————————————————————————————
-
-TEnumAsByte<EPlayerCharacterState> AHeroBuilderCharacter::GetCurrentState() const
-{
-	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-	{
-		return Sys->GetCurrentState(const_cast<AHeroBuilderCharacter*>(this));
-	}
-	return EPCS_Idle;
-}
-
-void AHeroBuilderCharacter::SetInteractTarget(AActor* Target)
-{
-	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-	{
-		Sys->SetInteractTarget(this, Target);
-	}
-}
-
-AActor* AHeroBuilderCharacter::GetInteractTarget() const
-{
-	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-	{
-		return Sys->GetInteractTarget(const_cast<AHeroBuilderCharacter*>(this));
-	}
-	return nullptr;
-}
-
 float AHeroBuilderCharacter::GetAttack() const
 {
 	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
@@ -131,18 +101,6 @@ void AHeroBuilderCharacter::SetAttack(float NewAttack)
 void AHeroBuilderCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-}
-
-void AHeroBuilderCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	if (HasAuthority())
-	{
-		if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-		{
-			Sys->UnregisterCharacter(this);
-		}
-	}
-	Super::EndPlay(EndPlayReason);
 }
 
 void AHeroBuilderCharacter::Tick(float DeltaTime)
@@ -209,25 +167,9 @@ void AHeroBuilderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 void AHeroBuilderCharacter::Move(const FInputActionValue& Value)
 {
-	//交互优先：只要交互流程进行中（追击/前摇/交互/后摇），就禁止一切玩家移动输入；
-	//但客户端追击逻辑(Subsystem::TickMoveToTarget)会设置bInternalDrivenMove=true主动调用本函数驱动移动，需要放行
-	UHB_CharacterSubsystem* Sys = GetCharacterSubsystem();
-	if (Sys)
-	{
-		const EPlayerCharacterState State = Sys->GetCurrentState(this);
-		if (State == EPCS_MoveToTarget ||
-			State == EPCS_PreInteract  ||
-			State == EPCS_Interact     ||
-			State == EPCS_PostInteract)
-		{
-			return;
-		}
-	}
-
 	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	if (Controller != nullptr)
+	if (CanMove()&&Controller != nullptr)
 	{
 		// find out which way is forward
 		const FRotator Rotation = Controller->GetControlRotation();
@@ -243,6 +185,12 @@ void AHeroBuilderCharacter::Move(const FInputActionValue& Value)
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
 	}
+}
+
+bool AHeroBuilderCharacter::CanMove()
+{
+	EPlayerCharacterState State = GetWorld()->GetSubsystem<UHB_CharacterSubsystem>()->GetCurrentState(this);
+    return State == EPCS_Idle || State == EPCS_Move||State==EPCS_MoveToTarget;
 }
 
 void AHeroBuilderCharacter::Look(const FInputActionValue& Value)
@@ -302,7 +250,6 @@ void AHeroBuilderCharacter::Server_ChangeConstructionMode_Implementation()
 void AHeroBuilderCharacter::Client_ChangeConstructionMode_Implementation()
 {
 	//客户端本地反馈：真正的模式切换由服务端权威驱动（Manager 的字段会通过复制下发到客户端），
-	//这里只做客户端侧的就近响应（例如埋点/UI刷新hook），保持与 Client_BeginInteract 风格一致。
 	UWorld* World = GetWorld();
 	if (!World)
 	{
@@ -334,7 +281,7 @@ void AHeroBuilderCharacter::OnInteractPressed(const FInputActionValue& Value)
 	if (GetNetMode() == NM_Client || GetNetMode() == NM_DedicatedServer)
 	{
 
-		Client_BeginInteract();
+		//Client_BeginInteract();
 		Server_BeginInteract();
 	}
 	else
@@ -344,6 +291,16 @@ void AHeroBuilderCharacter::OnInteractPressed(const FInputActionValue& Value)
 }
 
 void AHeroBuilderCharacter::Server_BeginInteract_Implementation()
+{
+	Multicast_BeginInteract();
+}
+
+void AHeroBuilderCharacter::Server_AbortInteract_Implementation()
+{
+	Multicast_AbortInteract();
+}
+
+void AHeroBuilderCharacter::Multicast_BeginInteract_Implementation()
 {
 	UHB_CharacterSubsystem* Sys = GetCharacterSubsystem();
 	if (!Sys)
@@ -358,27 +315,20 @@ void AHeroBuilderCharacter::Server_BeginInteract_Implementation()
 	Sys->BeginInteractFlow(this);
 }
 
-void AHeroBuilderCharacter::Server_AbortInteract_Implementation()
-{
-	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-	{
-		Sys->AbortInteract(this);
-	}
-}
-
 void AHeroBuilderCharacter::OnInteractReleased(const FInputActionValue& Value)
 {
 	ENetMode NetMode = GetNetMode();
 	if (NetMode == NM_Client || NetMode == NM_DedicatedServer)
 	{
 		Server_AbortInteract();
-		Client_AbortInteract();
+		//Client_AbortInteract();
 	}
-	else
+}
+
+void AHeroBuilderCharacter::Multicast_AbortInteract_Implementation()
+{
+	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
 	{
-		if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
-		{
-			Sys->AbortInteract(this);
-		}
+		Sys->AbortInteract(this);
 	}
 }

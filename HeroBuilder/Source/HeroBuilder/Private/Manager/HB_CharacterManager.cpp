@@ -130,31 +130,7 @@ void AHB_CharacterManager::SetCurrentlyState(ACharacter* InCharacter, EPlayerCha
 		return;
 	}
 	Entry.CurrentlyState = NewState;
-	CharacterStateContainer.MarkItemDirty(Entry);
-}
-
-AActor* AHB_CharacterManager::GetInteractTarget(ACharacter* InCharacter) const
-{
-	if (const FCharacterStateEntry* Entry = FindEntry(InCharacter))
-	{
-		return Entry->InteractTarget;
-	}
-	return nullptr;
-}
-
-void AHB_CharacterManager::SetInteractTarget(ACharacter* InCharacter, AActor* Target)
-{
-	if (!IsValid(InCharacter))
-	{
-		return;
-	}
-	FCharacterStateEntry& Entry = FindOrAddEntry(InCharacter);
-	if (Entry.InteractTarget == Target)
-	{
-		return;
-	}
-	Entry.InteractTarget = Target;
-	CharacterStateContainer.MarkItemDirty(Entry);
+	//CharacterStateContainer.MarkItemDirty(Entry);
 }
 
 float AHB_CharacterManager::GetAttack(ACharacter* InCharacter) const
@@ -178,7 +154,7 @@ void AHB_CharacterManager::SetAttack(ACharacter* InCharacter, float NewAttack)
 		return;
 	}
 	Entry.Attack = NewAttack;
-	CharacterStateContainer.MarkItemDirty(Entry);
+	//CharacterStateContainer.MarkItemDirty(Entry);
 }
 
 float AHB_CharacterManager::GetInteractRange(ACharacter* InCharacter) const
@@ -202,5 +178,21 @@ void AHB_CharacterManager::SetInteractRange(ACharacter* InCharacter, float NewRa
 		return;
 	}
 	Entry.InteractRange = NewRange;
-	CharacterStateContainer.MarkItemDirty(Entry);
+	//CharacterStateContainer.MarkItemDirty(Entry);
+}
+
+TArray<TObjectPtr<ACharacter>> AHB_CharacterManager::GetAllCharacters() const
+{
+    TArray<TObjectPtr<ACharacter>> Characters;
+    //预留避免多次realloc
+    Characters.Reserve(CharacterStateContainer.CharacterStateEntries.Num());
+    for (const FCharacterStateEntry& Entry : CharacterStateContainer.CharacterStateEntries)
+	{
+		if (IsValid(Entry.Character))
+		{
+			Characters.Add(Entry.Character);
+		}
+	}
+
+    return Characters;
 }

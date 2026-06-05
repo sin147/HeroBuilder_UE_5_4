@@ -37,10 +37,6 @@ public:
 	UPROPERTY()
 	TEnumAsByte<EPlayerCharacterState> CurrentlyState = EPCS_Idle;
 
-	//当前交互目标
-	UPROPERTY()
-	TObjectPtr<AActor> InteractTarget = nullptr;
-
 	//交互前摇时间
 	UPROPERTY()
 	float PreInteractDelay = 0.3f;
@@ -106,9 +102,6 @@ public:
 	EPlayerCharacterState GetCurrentlyState(ACharacter* InCharacter) const;
 	void SetCurrentlyState(ACharacter* InCharacter, EPlayerCharacterState NewState);
 
-	AActor* GetInteractTarget(ACharacter* InCharacter) const;
-	void SetInteractTarget(ACharacter* InCharacter, AActor* Target);
-
 	float GetAttack(ACharacter* InCharacter) const;
 	void SetAttack(ACharacter* InCharacter, float NewAttack);
 
@@ -117,6 +110,7 @@ public:
 
 	//—— 遍历 ——
 	const TArray<FCharacterStateEntry>& GetAllEntries() const { return CharacterStateContainer.CharacterStateEntries; }
+	TArray<TObjectPtr<ACharacter>> GetAllCharacters() const;
 
 private:
 	//全玩家角色状态表（整张数组复制给所有客户端；UPROPERTY不支持复制TMap，故用TArray）
