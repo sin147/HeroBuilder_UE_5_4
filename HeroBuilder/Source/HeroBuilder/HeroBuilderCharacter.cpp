@@ -208,30 +208,26 @@ void AHeroBuilderCharacter::Look(const FInputActionValue& Value)
 
 void AHeroBuilderCharacter::ChangeConstructionMode(const FInputActionValue& Value)
 {
-	ENetMode NetMode = GetNetMode();
-	if (NetMode == NM_Client || NetMode == NM_DedicatedServer)
-	{
-        Server_ChangeConstructionMode();
-		Client_ChangeConstructionMode();
-	}
-	else
-	{
-		//单机/Listen Server宿主：本地直接走切换逻辑
-		if (UWorld* World = GetWorld())
-		{
-			if (UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>())
-			{
-				const EInteractMode CurMode = InteractSys->GetInteractMode(this);
-				const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
-				InteractSys->SwitchInteractMode(this, NewMode);
-			}
-		}
-	}
+	Server_ChangeConstructionMode();
+	Client_ChangeConstructionMode();
 }
 
 void AHeroBuilderCharacter::Server_ChangeConstructionMode_Implementation()
 {
-	//服务端权威切换：在 Normal 与 Construction 之间互切
+	//单机/Listen Server宿主：本地直接走切换逻辑
+	if (UWorld* World = GetWorld())
+	{
+		if (UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>())
+		{
+			const EInteractMode CurMode = InteractSys->GetInteractMode(this);
+			const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
+			InteractSys->SwitchInteractMode(this, NewMode);
+		}
+	}
+}
+
+void AHeroBuilderCharacter::Client_ChangeConstructionMode_Implementation()
+{
 	UWorld* World = GetWorld();
 	if (!World)
 	{
@@ -247,22 +243,9 @@ void AHeroBuilderCharacter::Server_ChangeConstructionMode_Implementation()
 	InteractSys->SwitchInteractMode(this, NewMode);
 }
 
-void AHeroBuilderCharacter::Client_ChangeConstructionMode_Implementation()
+void AHeroBuilderCharacter::Multicast_ChangeConstructionMode_Implementation()
 {
-	//客户端本地反馈：真正的模式切换由服务端权威驱动（Manager 的字段会通过复制下发到客户端），
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-	UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>();
-	if (!InteractSys)
-	{
-		return;
-	}
-	const EInteractMode CurMode = InteractSys->GetInteractMode(this);
-	const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
-	InteractSys->SwitchInteractMode(this, NewMode);
+
 }
 
 void AHeroBuilderCharacter::OnInteractPressed(const FInputActionValue& Value)

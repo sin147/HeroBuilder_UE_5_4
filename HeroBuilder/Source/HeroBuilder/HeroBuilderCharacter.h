@@ -79,6 +79,8 @@ protected:
 	//通知 Owning Client 切换建造模式（客户端本地反馈/状态刷新）
 	UFUNCTION(Client, Reliable)
 	void Client_ChangeConstructionMode();
+	UFUNCTION(NetMulticast,Reliable)
+	void Multicast_ChangeConstructionMode();
 	/******************************************************/
 	void OnInteractPressed(const FInputActionValue& Value);
 	//请求服务端开启一次交互流程（按下交互键时由客户端发起）
