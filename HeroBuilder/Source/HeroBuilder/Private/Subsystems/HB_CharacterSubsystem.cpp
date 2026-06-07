@@ -159,6 +159,7 @@ void UHB_CharacterSubsystem::SwitchState(ACharacter* InCharacter, EPlayerCharact
 	{
 		OnLeaveState(InCharacter, CurrentState);
 		OnEnterState(InCharacter, NewState);
+		//服务端权威路径：在 OnLeaveState/OnEnterState 内部已分别广播 Leave/Enter；这里补发 Changed
 		OnCharacterStateChanged.Broadcast(InCharacter, NewState, CurrentState);
 	}
 }
@@ -281,8 +282,12 @@ void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharac
 	}
 	default:
 		break;
-    }
-	OnCharacterEnterState.Broadcast(InCharacter, EnterState);
+	}
+	//服务端权威路径：直接广播 Enter（Leave 由 OnLeaveState 负责，Changed 由 SwitchState 负责）
+	if (EnterState != EPCS_None)
+	{
+		OnCharacterEnterState.Broadcast(InCharacter, EnterState);
+	}
 }
 
 void UHB_CharacterSubsystem::OnLeaveState(ACharacter* InCharacter, EPlayerCharacterState LeaveState)
@@ -334,7 +339,11 @@ void UHB_CharacterSubsystem::OnLeaveState(ACharacter* InCharacter, EPlayerCharac
 		Mgr->SetCurrentlyState(InCharacter, EPCS_None);
 	}
 	UE_LOG(LogCharacterSubsystem, Log, TEXT("'%s' Leave State '%s'!"), *GetNameSafe(InCharacter), *StateName);
-	OnCharacterLeaveState.Broadcast(InCharacter, LeaveState);
+	//服务端权威路径：直接广播 Leave（Enter 由 OnEnterState 负责，Changed 由 SwitchState 负责）
+	if (LeaveState != EPCS_None)
+	{
+		OnCharacterLeaveState.Broadcast(InCharacter, LeaveState);
+	}
 }
 
 void UHB_CharacterSubsystem::AbortInteract(ACharacter* InCharacter)

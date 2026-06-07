@@ -28,6 +28,9 @@ USTRUCT()
 struct FCharacterStateEntry : public FFastArraySerializerItem
 {
 	GENERATED_BODY()
+private:
+	//前状态
+	TEnumAsByte<EPlayerCharacterState> PreviousState = EPCS_Idle;
 public:
 	//所属角色（作为该条记录的Key）
 	UPROPERTY()
@@ -58,12 +61,18 @@ public:
 	void PostReplicatedChange(const FFastArraySerializer& ArraySerializer);
 };
 
+class AHB_CharacterManager;
+
 USTRUCT()
 struct FCharacterStateContainer : public FFastArraySerializer
 {
 	GENERATED_BODY()
 	UPROPERTY()
 	TArray<FCharacterStateEntry> CharacterStateEntries;
+
+	//反向指针：仅本地使用，不参与复制；供FastArrayItem回调反查Manager→World→Subsystem
+	TWeakObjectPtr<AHB_CharacterManager> OwnerManager;
+
 	bool NetDeltaSerialize(FNetDeltaSerializeInfo& Parms)
 	{
 		return FastArrayDeltaSerialize<FCharacterStateEntry, FCharacterStateContainer>(CharacterStateEntries, Parms, *this);
@@ -93,6 +102,7 @@ public:
 	AHB_CharacterManager();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PostInitializeComponents() override;
 
 	//—— 表项注册/移除 ——
 	void RegisterCharacter(ACharacter* InCharacter);

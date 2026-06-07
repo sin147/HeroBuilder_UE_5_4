@@ -48,80 +48,9 @@ AHB_Building_Base::AHB_Building_Base()
 	}
 }
 
-void AHB_Building_Base::InitialBuilding(FBuildingConfig InConfig)
+void AHB_Building_Base::TickBuildingState(float DeltaTime)
 {
-	CombatRange = InConfig.CombatRange;
-	Attack=InConfig.Attack;
-	RotateSpeed = InConfig.RotateSpeed;
-	PreAttackDelay = InConfig.PreAttackDelay;
-	PostAttackDelay = InConfig.PostAttackDelay;
-
-	//将配置中的交互类型应用到 InteractComponent，覆盖构造函数中的默认值（IT_Attack）
-	if (InteractComponent)
-	{
-		InteractComponent->SetInteractType(InConfig.InteractType);
-	}
-}
-
-void AHB_Building_Base::SetTarget(AActor* InTarget)
-{
-    if (IsValidTarget(InTarget) || InTarget == nullptr)
-    {
-        Target = InTarget;
-    }
-}
-
-FString AHB_Building_Base::GetStateName(EBuildingState State)
-{
-	switch (State)
-	{
-	case EBuildingState::BS_Idle: return TEXT("Idle");
-	case EBuildingState::BS_Rotate: return TEXT("Rotate");
-	case EBuildingState::BS_PreAttack: return TEXT("PreAttack");
-	case EBuildingState::BS_Attack: return TEXT("Attack");
-	case EBuildingState::BS_PostAttack: return TEXT("PostAttack");
-	case EBuildingState::BS_Death: return TEXT("Death");
-	default: return TEXT("Unknown");
-	}
-}
-
-bool AHB_Building_Base::SwitchState(EBuildingState NewState)
-{
-    if(CurrentState == NewState|| CurrentState == EBuildingState::BS_Death)
-	{
-		return false;
-	}
-	UE_LOG(LogTemp, Log, TEXT("SwitchState %s"), *GetStateName(NewState));
-	CurrentState = NewState;
-	return true;
-}
-
-
-
-// Called when the game starts or when spawned
-void AHB_Building_Base::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// 绑定伤害组件回调
-	if (DamageComponent)
-	{
-		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Building_Base::HandleHealthChanged);
-		DamageComponent->OnDeath.AddDynamic(this, &AHB_Building_Base::HandleDeath);
-		if (HasAuthority())
-		{
-			DamageComponent->InitHealth(MaxHealth);
-			// 默认出生即“待修建”：把血量打成 0，触发 OnDeath -> HandleDeath，进入 BS_Death 并允许玩家在 IM_Normal 下治疗复活
-			DamageComponent->ApplyDamage(nullptr, MaxHealth);
-		}
-	}
-}
-
-// Called every frame
-void AHB_Building_Base::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-	if (HasAuthority())
+    if (HasAuthority())
 	{
 		if (CurrentState == EBuildingState::BS_Death)
 		{
@@ -264,6 +193,82 @@ void AHB_Building_Base::Tick(float DeltaTime)
 			break;
 		}
 	}
+}
+
+void AHB_Building_Base::InitialBuilding(FBuildingConfig InConfig)
+{
+	CombatRange = InConfig.CombatRange;
+	Attack=InConfig.Attack;
+	RotateSpeed = InConfig.RotateSpeed;
+	PreAttackDelay = InConfig.PreAttackDelay;
+	PostAttackDelay = InConfig.PostAttackDelay;
+
+	//将配置中的交互类型应用到 InteractComponent，覆盖构造函数中的默认值（IT_Attack）
+	if (InteractComponent)
+	{
+		InteractComponent->SetInteractType(InConfig.InteractType);
+	}
+}
+
+void AHB_Building_Base::SetTarget(AActor* InTarget)
+{
+    if (IsValidTarget(InTarget) || InTarget == nullptr)
+    {
+        Target = InTarget;
+    }
+}
+
+FString AHB_Building_Base::GetStateName(EBuildingState State)
+{
+	switch (State)
+	{
+	case EBuildingState::BS_Idle: return TEXT("Idle");
+	case EBuildingState::BS_Rotate: return TEXT("Rotate");
+	case EBuildingState::BS_PreAttack: return TEXT("PreAttack");
+	case EBuildingState::BS_Attack: return TEXT("Attack");
+	case EBuildingState::BS_PostAttack: return TEXT("PostAttack");
+	case EBuildingState::BS_Death: return TEXT("Death");
+	default: return TEXT("Unknown");
+	}
+}
+
+bool AHB_Building_Base::SwitchState(EBuildingState NewState)
+{
+    if(CurrentState == NewState|| CurrentState == EBuildingState::BS_Death)
+	{
+		return false;
+	}
+	UE_LOG(LogTemp, Log, TEXT("SwitchState %s"), *GetStateName(NewState));
+	CurrentState = NewState;
+	return true;
+}
+
+
+
+// Called when the game starts or when spawned
+void AHB_Building_Base::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// 绑定伤害组件回调
+	if (DamageComponent)
+	{
+		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Building_Base::HandleHealthChanged);
+		DamageComponent->OnDeath.AddDynamic(this, &AHB_Building_Base::HandleDeath);
+		if (HasAuthority())
+		{
+			DamageComponent->InitHealth(MaxHealth);
+			// 默认出生即“待修建”：把血量打成 0，触发 OnDeath -> HandleDeath，进入 BS_Death 并允许玩家在 IM_Normal 下治疗复活
+			DamageComponent->ApplyDamage(nullptr, MaxHealth);
+		}
+	}
+}
+
+// Called every frame
+void AHB_Building_Base::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	TickBuildingState(DeltaTime);
 }
 
 void AHB_Building_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)

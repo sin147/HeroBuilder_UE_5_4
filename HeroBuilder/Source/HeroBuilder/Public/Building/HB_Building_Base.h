@@ -60,6 +60,7 @@ private:
 
 	// Sets default values for this actor's properties
 	AHB_Building_Base();
+	void TickBuildingState(float DeltaTime);
 
 protected:
 	// Called when the game starts or when spawned
