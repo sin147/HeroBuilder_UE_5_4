@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Manager/HB_Base_Manager.h"
 #include "Config/InteractData.h"
+#include "Net/Serialization/FastArraySerializer.h"
 #include "HB_InteractManager.generated.h"
 
 class ACharacter;
@@ -12,11 +13,16 @@ class AActor;
 
 //EInteractManagerInteractMode 的定义已迁移至 Config/InteractData.h，避免循环依赖
 
-//单条玩家交互数据
+//单条玩家交互数据（参与FastArray差量复制）
 USTRUCT()
-struct FInteractEntry
+struct FInteractEntry : public FFastArraySerializerItem
 {
 	GENERATED_BODY()
+private:
+	//本地快照：仅本地使用、不参与复制；客户端PostReplicatedAdd/Change中维护，便于差量比较
+	TEnumAsByte<EInteractType> PreviousInteractType = IT_Normal;
+	TEnumAsByte<EInteractMode> PreviousInteractMode = IM_Normal;
+	TWeakObjectPtr<AActor>     PreviousInteractTarget = nullptr;
 public:
 	//所属角色（作为该条记录的Key）
 	UPROPERTY()
@@ -31,11 +37,43 @@ public:
 	//当前最近的交互目标（由InteractSubsystem周期性更新）
 	UPROPERTY()
 	TObjectPtr<AActor> InteractTarget = nullptr;
+
+	//—— FastArray 客户端回调 ——
+	void PreReplicatedRemove(const FFastArraySerializer& ArraySerializer);
+	void PostReplicatedAdd(const FFastArraySerializer& ArraySerializer);
+	void PostReplicatedChange(const FFastArraySerializer& ArraySerializer);
+};
+
+class AHB_InteractManager;
+
+USTRUCT()
+struct FInteractContainer : public FFastArraySerializer
+{
+	GENERATED_BODY()
+	UPROPERTY()
+	TArray<FInteractEntry> InteractEntries;
+
+	//反向指针：仅本地使用，不参与复制；供FastArrayItem回调反查Manager→World→Subsystem
+	TWeakObjectPtr<AHB_InteractManager> OwnerManager;
+
+	bool NetDeltaSerialize(FNetDeltaSerializeInfo& Parms)
+	{
+		return FastArrayDeltaSerialize<FInteractEntry, FInteractContainer>(InteractEntries, Parms, *this);
+	}
+};
+//关键：告诉 UE 这个结构体走 NetDeltaSerializer
+template<>
+struct TStructOpsTypeTraits<FInteractContainer> : public TStructOpsTypeTraitsBase2<FInteractContainer>
+{
+	enum
+	{
+		WithNetDeltaSerializer = true
+	};
 };
 
 /**
  * 交互管理器（单例）
- * 服务端权威：以 Character 为 Key 维护所有玩家的交互类型/交互模式；整张表复制给所有客户端。
+ * 服务端权威：以 Character 为 Key 维护所有玩家的交互类型/交互模式；整张表通过FastArray差量复制给所有客户端。
  */
 UCLASS()
 class HEROBUILDER_API AHB_InteractManager : public AHB_Base_Manager
@@ -46,6 +84,7 @@ public:
 	AHB_InteractManager();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PostInitializeComponents() override;
 
 	//—— 交互类型（服务端权威） ——
 	EInteractType GetCurrentInteractType(ACharacter* InCharacter) const;
@@ -63,17 +102,12 @@ public:
 	void RemoveEntry(ACharacter* InCharacter);
 
 private:
-	//全玩家交互数据表（整张数组复制给所有客户端；UPROPERTY不支持复制TMap，故用TArray）
-	UPROPERTY(ReplicatedUsing = OnRep_CharacterInteractArray)
-	TArray<FInteractEntry> CharacterInteractArray;
+	//全玩家交互数据表（FastArray差量复制给所有客户端）
+	UPROPERTY(Replicated)
+	FInteractContainer CharacterInteractContainer;
 
-	//本地缓存：客户端上一次同步收到的“自己那一项”，用于OnRep时对比触发回调
-	FInteractEntry LastLocalEntry;
-	bool bHasLastLocalEntry = false;
-
-	UFUNCTION()
-	void OnRep_CharacterInteractArray();
-
-	//客户端：尝试找到“自己的Character”（自治代理 / 监听服务器上的本地玩家）
-	ACharacter* FindLocalCharacter() const;
+	//查表辅助
+	const FInteractEntry* FindEntry(ACharacter* InCharacter) const;
+	FInteractEntry* FindEntryMutable(ACharacter* InCharacter);
+	FInteractEntry& FindOrAddEntry(ACharacter* InCharacter);
 };

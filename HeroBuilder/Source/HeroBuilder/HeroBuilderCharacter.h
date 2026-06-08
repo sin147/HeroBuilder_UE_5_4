@@ -66,6 +66,10 @@ public:
 
 	//Move对外暴露（Subsystem的TickMoveToTarget会调用）
 	void Move(const FInputActionValue& Value);
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnStartInteract();
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnEndInteract();
 
 protected:
 	bool CanMove();

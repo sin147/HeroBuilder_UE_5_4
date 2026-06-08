@@ -62,6 +62,7 @@ public:
 	FOnCharacterEnterState OnCharacterEnterState;
 	UPROPERTY(BlueprintAssignable)
 	FOnCharacterLeaveState OnCharacterLeaveState;
+	bool IsInteracting(AHeroBuilderCharacter* InCharacter);
 
 private:
 	//状态进入/离开（仅服务端权威环境调用）

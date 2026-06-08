@@ -209,21 +209,23 @@ void AHeroBuilderCharacter::Look(const FInputActionValue& Value)
 void AHeroBuilderCharacter::ChangeConstructionMode(const FInputActionValue& Value)
 {
 	Server_ChangeConstructionMode();
-	Client_ChangeConstructionMode();
 }
 
 void AHeroBuilderCharacter::Server_ChangeConstructionMode_Implementation()
 {
-	//单机/Listen Server宿主：本地直接走切换逻辑
-	if (UWorld* World = GetWorld())
+	UWorld* World = GetWorld();
+	if (!World)
 	{
-		if (UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>())
-		{
-			const EInteractMode CurMode = InteractSys->GetInteractMode(this);
-			const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
-			InteractSys->SwitchInteractMode(this, NewMode);
-		}
+		return;
 	}
+	UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>();
+	if (!InteractSys)
+	{
+		return;
+	}
+	const EInteractMode CurMode = InteractSys->GetInteractMode(this);
+	const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
+	InteractSys->SwitchInteractMode(this, NewMode);
 }
 
 void AHeroBuilderCharacter::Client_ChangeConstructionMode_Implementation()
@@ -245,7 +247,19 @@ void AHeroBuilderCharacter::Client_ChangeConstructionMode_Implementation()
 
 void AHeroBuilderCharacter::Multicast_ChangeConstructionMode_Implementation()
 {
-
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	UHB_InteractSubsystem* InteractSys = World->GetSubsystem<UHB_InteractSubsystem>();
+	if (!InteractSys)
+	{
+		return;
+	}
+	const EInteractMode CurMode = InteractSys->GetInteractMode(this);
+	const EInteractMode NewMode = (CurMode == IM_Construction) ? IM_Normal : IM_Construction;
+	InteractSys->SwitchInteractMode(this, NewMode);
 }
 
 void AHeroBuilderCharacter::OnInteractPressed(const FInputActionValue& Value)
@@ -301,11 +315,11 @@ void AHeroBuilderCharacter::Multicast_BeginInteract_Implementation()
 void AHeroBuilderCharacter::OnInteractReleased(const FInputActionValue& Value)
 {
 	ENetMode NetMode = GetNetMode();
-	if (NetMode == NM_Client || NetMode == NM_DedicatedServer)
+	if (GetNetMode() == NM_Client || GetNetMode() == NM_DedicatedServer)
 	{
-		Server_AbortInteract();
-		//Client_AbortInteract();
-	}
+        Server_AbortInteract();
+        //Client_AbortInteract();
+    }
 }
 
 void AHeroBuilderCharacter::Multicast_AbortInteract_Implementation()

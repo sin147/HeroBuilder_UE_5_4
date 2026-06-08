@@ -30,4 +30,5 @@ void AHB_GridManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHB_GridManager, UsedGridInfos);
+	DOREPLIFETIME(AHB_GridManager, FreeGridInfos);
 }

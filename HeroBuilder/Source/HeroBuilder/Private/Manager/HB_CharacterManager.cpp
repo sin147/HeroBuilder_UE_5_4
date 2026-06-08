@@ -13,41 +13,29 @@
 static void DispatchClientStateChanged(const FFastArraySerializer& InArraySerializer, ACharacter* InCharacter,
 	EPlayerCharacterState OldState, EPlayerCharacterState NewState)
 {
-	//if (!IsValid(InCharacter))
-	//{
-	//	return;
-	//}
-	//if (OldState == NewState)
-	//{
-	//	return;
-	//}
-	////反查容器 → Manager → World → Subsystem
-	//const FCharacterStateContainer& Container = static_cast<const FCharacterStateContainer&>(InArraySerializer);
-	//AHB_CharacterManager* Mgr = Container.OwnerManager.Get();
-	//if (!IsValid(Mgr))
-	//{
-	//	return;
-	//}
-	//UWorld* World = Mgr->GetWorld();
-	//if (!World)
-	//{
-	//	return;
-	//}
-	//UHB_CharacterSubsystem* Sys = World->GetSubsystem<UHB_CharacterSubsystem>();
-	//if (!Sys)
-	//{
-	//	return;
-	//}
-	////客户端 FastArray 回调路径：直接 Broadcast 公开委托，与服务端权威路径产生一致的 Leave/Enter/Changed 通知
-	//if (OldState != EPCS_None)
-	//{
-	//	Sys->OnCharacterLeaveState.Broadcast(InCharacter, OldState);
-	//}
-	//if (NewState != EPCS_None)
-	//{
-	//	Sys->OnCharacterEnterState.Broadcast(InCharacter, NewState);
-	//}
-	//Sys->OnCharacterStateChanged.Broadcast(InCharacter, NewState, OldState);
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	//反查容器 → Manager → World → Subsystem
+	const FCharacterStateContainer& Container = static_cast<const FCharacterStateContainer&>(InArraySerializer);
+	AHB_CharacterManager* Mgr = Container.OwnerManager.Get();
+	if (!IsValid(Mgr))
+	{
+		return;
+	}
+	UWorld* World = Mgr->GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	UHB_CharacterSubsystem* Sys = World->GetSubsystem<UHB_CharacterSubsystem>();
+	if (!Sys)
+	{
+		return;
+	}
+	//客户端 FastArray 回调路径：直接 Broadcast 公开委托，与服务端权威路径产生一致的 Leave/Enter/Changed 通知
+	Sys->SwitchState(InCharacter, NewState);
 }
 
 //—— FCharacterStateEntry 的 FastArray 回调（客户端在收到 增/删/改 时被调用） ——

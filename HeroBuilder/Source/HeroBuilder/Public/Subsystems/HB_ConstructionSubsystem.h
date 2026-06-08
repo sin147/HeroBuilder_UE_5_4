@@ -11,16 +11,8 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogConstructionSubsystem,Log,All)
 
 class AHB_Building_Base;
-USTRUCT()
-struct FPreBuildingInfo
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY()
-	TSubclassOf<AHB_Building_Base> BuildingClass;
-	UPROPERTY()
-	TObjectPtr<AStaticMeshActor> PreBuildingMeshActor;
-};
+class AHB_ConstructionManager;
+class APreBuilding;
 
 /**
  * 
@@ -34,8 +26,6 @@ private:
 	float GridHeight=100;
 	UPROPERTY()
 	TObjectPtr<UConstructionData> ConstructionData;
-	UPROPERTY()
-	TMap<TObjectPtr<ACharacter>, FPreBuildingInfo> BuildingClassMap;
 	void TickPreviewBuildingPos();
 
 public:
@@ -48,4 +38,7 @@ public:
 	bool CheckCanConstruction(ACharacter* InCharacter);
 	void ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
 	void CancelConstructionMode(TObjectPtr<ACharacter>InCharacter);
+
+	//获取单例 ConstructionManager：统一走基类 GetManager<T>()，服务端读 GameMode、客户端读已复制的 GameState
+	AHB_ConstructionManager* GetConstructionManager();
 };

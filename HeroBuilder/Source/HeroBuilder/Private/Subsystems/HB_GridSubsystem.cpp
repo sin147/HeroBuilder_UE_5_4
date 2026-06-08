@@ -82,6 +82,33 @@ TArray<FGridInfo> UHB_GridSubsystem::GetFreeGridIndexs()
 {
 	return GetManager<AHB_GridManager>()->GetFreeGridInfo();
 }
+
+bool UHB_GridSubsystem::IsGridUsed(int32 InX, int32 InY) const
+{
+	AHB_GridManager* GridMgr = const_cast<UHB_GridSubsystem*>(this)->GetManager<AHB_GridManager>();
+	if (!GridMgr)
+	{
+		UE_LOG(LogGridSubsystem, Warning, TEXT("IsGridUsed: GridManager is null"));
+		return false;
+	}
+	//FGridInfo 已重载 operator==，可直接 Contains 查找
+	return GridMgr->GetUsedGridInfo().Contains(FGridInfo(InX, InY));
+}
+
+void UHB_GridSubsystem::OccupyGrid(int32 InX, int32 InY)
+{
+	AHB_GridManager* GridMgr = GetManager<AHB_GridManager>();
+	if (!GridMgr)
+	{
+		UE_LOG(LogGridSubsystem, Warning, TEXT("OccupyGrid: GridManager is null"));
+		return;
+	}
+	//直接调用 Manager 的 AddUnique 写入。
+	//注：UsedGridInfos 本身是 Replicated，但客户端直接写本地数组是合法的——
+	//等服务端下次 Bunch 到达时会被权威值覆盖刷新；这正是"乐观预占位"的预期行为。
+	GridMgr->CacheUsedGridInfo(InX, InY);
+}
+
 FVector2D UHB_GridSubsystem::CalulateGridIndexByLocation(const FVector& Location) const
 {
 	if (!IsValid(GridData))

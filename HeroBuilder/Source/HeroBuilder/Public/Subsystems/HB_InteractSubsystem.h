@@ -81,5 +81,10 @@ public:
 	UFUNCTION(BlueprintCallable)
 	float GetPreInteractDelay(ACharacter* InCharacter) const;
 	UFUNCTION(BlueprintCallable)
-	float GetPostInteractDelay(ACharacter* InCharacter) const;
+	float GetPreInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const;
+	//获取玩家交互延迟
+	UFUNCTION(BlueprintCallable)
+    float GetPostInteractDelay(ACharacter* InCharacter) const;
+	UFUNCTION(BlueprintCallable)
+    float GetPostInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const;
 };

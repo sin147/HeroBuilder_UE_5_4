@@ -5,6 +5,7 @@
 #include "Subsystems/HB_BuildingSubsystem.h"
 #include "Subsystems/HB_GridSubsystem.h"
 #include "Subsystems/HB_CharacterSubsystem.h"
+#include "Manager/HB_ConstructionManager.h"
 #include "Camera/CameraComponent.h"
 #include "../HeroBuilderCharacter.h"
 #include "Building/HB_Building_Base.h"
@@ -52,20 +53,29 @@ void UHB_ConstructionSubsystem::SwitchBuilding(ACharacter* InOwnerCharacter, TSu
 		return;
 	}
 
-	FPreBuildingInfo* PreBuildingInfo = BuildingClassMap.Find(InOwnerCharacter);
-	if (!PreBuildingInfo || !IsValid(PreBuildingInfo->PreBuildingMeshActor))
+	AHB_ConstructionManager* Mgr = GetConstructionManager();
+	if (!Mgr)
+	{
+		UE_LOG(LogConstructionSubsystem, Warning, TEXT("SwitchBuilding: ConstructionManager not ready"));
+		return;
+	}
+	APreBuilding* PreActor = Mgr->GetPreBuildingMeshActor(InOwnerCharacter);
+	if (!IsValid(PreActor))
 	{
 		UE_LOG(LogConstructionSubsystem, Warning, TEXT("SwitchBuilding: character has not entered ConstructionMode"));
+		return;
+	}
+	//未激活状态不允许切换建筑
+	if (!Mgr->GetIsActive(InOwnerCharacter))
+	{
+		UE_LOG(LogConstructionSubsystem, Warning, TEXT("SwitchBuilding: ConstructionMode is not active for this character"));
 		return;
 	}
 
 	//更新预览模型和建筑类
 	UStaticMesh* PreBuildingMesh = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetBuildingPreviewMesh(InBuildingClass);
-	PreBuildingInfo->PreBuildingMeshActor->GetStaticMeshComponent()->SetStaticMesh(PreBuildingMesh);
-	PreBuildingInfo->BuildingClass = InBuildingClass;
-
-	GridWidth = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridWidth();
-	GridHeight = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridHeight();
+	PreActor->SetStaticMesh(PreBuildingMesh);
+	Mgr->SetBuildingClass(InOwnerCharacter, InBuildingClass);
 }
 
 void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
@@ -73,14 +83,50 @@ void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
 	// 建造逻辑仅在权威端执行
 	if (NetMode == NM_Client)
 	{
+		//——客户端"乐观预占位"——
+		//服务端 SpawnBuilding 后会通过 OnSpawnBuilding 占位并 Replicate 回来，但中间存在一次 RTT 窗口。
+		//为了避免该窗口内玩家在同一格再次触发建造，这里先做本地校验+本地预占位：
+		//  1) 必须先通过 CheckCanConstruction（避免占到已经被同步过来的占用格上）
+		//  2) 通过则把目标 Grid 写入本地 UsedGridInfos，等服务端权威值到达时会自动覆盖刷新
+		if (!CheckCanConstruction(InCharacter))
+		{
+			return;
+		}
+		AHB_ConstructionManager* Mgr = GetConstructionManager();
+		if (!Mgr)
+		{
+			return;
+		}
+		APreBuilding* PreActor = Mgr->GetPreBuildingMeshActor(InCharacter);
+		if (!IsValid(PreActor))
+		{
+			return;
+		}
+		UHB_GridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UHB_GridSubsystem>();
+		if (!GridSubsystem)
+		{
+			return;
+		}
+		const FVector PreviewLocation = PreActor->GetActorLocation();
+		const FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(PreviewLocation);
+		GridSubsystem->OccupyGrid(static_cast<int32>(GridIndex.X), static_cast<int32>(GridIndex.Y));
 		return;
 	}
 	if (CheckCanConstruction(InCharacter))
 	{
-		FPreBuildingInfo* PreBuildingInfo = BuildingClassMap.Find(InCharacter);
-		AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingInfo->PreBuildingMeshActor;
+		AHB_ConstructionManager* Mgr = GetConstructionManager();
+		if (!Mgr)
+		{
+			return;
+		}
+		APreBuilding* TargetPreStaticMeshActor = Mgr->GetPreBuildingMeshActor(InCharacter);
+		TSubclassOf<AHB_Building_Base> BuildingClass = Mgr->GetBuildingClass(InCharacter);
+		if (!IsValid(TargetPreStaticMeshActor) || !IsValid(BuildingClass))
+		{
+			return;
+		}
 		GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuilding(
-			PreBuildingInfo->BuildingClass,
+			BuildingClass,
 			FTransform(TargetPreStaticMeshActor->GetActorRotation(), TargetPreStaticMeshActor->GetActorLocation(), TargetPreStaticMeshActor->GetActorScale()));
 		UE_LOG(LogConstructionSubsystem, Log, TEXT("ConstructionBegin: spawn building"));
 	}
@@ -94,16 +140,33 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 		return;
 	}
 
-	// 同一个 Character 重复进入直接忽略，避免泄漏
-	if (BuildingClassMap.Contains(InCharacter))
+	AHB_ConstructionManager* Mgr = GetConstructionManager();
+	if (!Mgr)
 	{
+		UE_LOG(LogConstructionSubsystem, Warning, TEXT("ActiveConstructionMode: ConstructionManager not ready"));
+		return;
+	}
+
+	//已存在预览体：复用+重新显示，不再 Spawn
+	if (Mgr->HasEntry(InCharacter))
+	{
+		if (Mgr->GetIsActive(InCharacter))
+		{
+			//重复进入，忽略
+			return;
+		}
+		if (APreBuilding* ExistActor = Mgr->GetPreBuildingMeshActor(InCharacter))
+		{
+			ExistActor->SetActorHiddenInGame(false);
+		}
+		Mgr->SetIsActive(InCharacter, true);
 		return;
 	}
 
 	TSubclassOf<AHB_Building_Base> DefaultBuildingClass = ConstructionData->GetDefaultBuildingClass();
 
-	// 生成预览模型
-	AStaticMeshActor* NewPreStaticMeshActor = GetWorld()->SpawnActor<AStaticMeshActor>();
+	// 首次进入：生成预览模型
+	APreBuilding* NewPreStaticMeshActor = GetWorld()->SpawnActor<APreBuilding>();
 	if (!NewPreStaticMeshActor)
 	{
 		UE_LOG(LogConstructionSubsystem, Warning, TEXT("Failed to spawn PreStaticMeshActor"));
@@ -112,31 +175,39 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 	NewPreStaticMeshActor->SetMobility(EComponentMobility::Movable);
 
 	UStaticMesh* PreBuildingMesh = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetBuildingPreviewMesh(DefaultBuildingClass);
-	NewPreStaticMeshActor->GetStaticMeshComponent()->SetStaticMesh(PreBuildingMesh);
+	NewPreStaticMeshActor->SetStaticMesh(PreBuildingMesh);
+	NewPreStaticMeshActor->SetActorHiddenInGame(false);
 
-	FPreBuildingInfo NewInfo;
-	NewInfo.BuildingClass = DefaultBuildingClass;
-	NewInfo.PreBuildingMeshActor = NewPreStaticMeshActor;
-	BuildingClassMap.Add(InCharacter, NewInfo);
+	//通过 Manager 写入：会自动触发 FastArray 差量复制到所有客户端
+	Mgr->SetPreBuildingMeshActor(InCharacter, NewPreStaticMeshActor);
+	Mgr->SetBuildingClass(InCharacter, DefaultBuildingClass);
+	Mgr->SetIsActive(InCharacter, true);
 }
 
 void UHB_ConstructionSubsystem::CancelConstructionMode(TObjectPtr<ACharacter>InCharacter)
 {
-	FPreBuildingInfo* PreBuildingInfo = BuildingClassMap.Find(InCharacter);
-	if (!PreBuildingInfo)
+	AHB_ConstructionManager* Mgr = GetConstructionManager();
+	if (!Mgr || !Mgr->HasEntry(InCharacter))
 	{
 		return;
 	}
-	if (IsValid(PreBuildingInfo->PreBuildingMeshActor))
+	//不再 Destroy：仅隐藏+取消激活，保留 Actor 供下次复用
+	if (APreBuilding* PreActor = Mgr->GetPreBuildingMeshActor(InCharacter))
 	{
-		PreBuildingInfo->PreBuildingMeshActor->Destroy();
+		PreActor->SetActorHiddenInGame(true);
 	}
-	BuildingClassMap.Remove(InCharacter);
+	Mgr->SetIsActive(InCharacter, false);
 }
 
 void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 {
-	if (BuildingClassMap.IsEmpty())
+	AHB_ConstructionManager* Mgr = GetConstructionManager();
+	if (!Mgr)
+	{
+		return;
+	}
+	const TArray<FPreBuildingInfo>& Entries = Mgr->GetAllEntries();
+	if (Entries.Num() == 0)
 	{
 		return;
 	}
@@ -147,14 +218,19 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 		return;
 	}
 
-	for (const TPair<TObjectPtr<ACharacter>, FPreBuildingInfo>& Pair : BuildingClassMap)
+	for (const FPreBuildingInfo& Entry : Entries)
 	{
-		AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(Pair.Key);
+		//未激活状态跳过：隐藏中的预览体不需要跟随镜头更新位置
+		if (!Entry.bIsActive)
+		{
+			continue;
+		}
+		AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(Entry.Character.Get());
 		if (!PlayerCharacter)
 		{
 			continue;
 		}
-		AStaticMeshActor* BuildingMeshActor = Pair.Value.PreBuildingMeshActor;
+		AStaticMeshActor* BuildingMeshActor = Entry.PreBuildingMeshActor;
 		if (!IsValid(BuildingMeshActor))
 		{
 			continue;
@@ -172,45 +248,41 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 
 bool UHB_ConstructionSubsystem::CheckCanConstruction(ACharacter* InCharacter)
 {
-	AHeroBuilderCharacter* PlayerCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
-	FPreBuildingInfo* PreBuildingInfo = BuildingClassMap.Find(InCharacter);
-	if (!PreBuildingInfo || !IsValid(PreBuildingInfo->PreBuildingMeshActor))
+	AHB_ConstructionManager* Mgr = GetConstructionManager();
+	if (!Mgr)
 	{
 		return false;
 	}
-	AStaticMeshActor* TargetPreStaticMeshActor = PreBuildingInfo->PreBuildingMeshActor;
-	FVector CheckLocation = TargetPreStaticMeshActor->GetActorLocation();
-	FVector2D GridIndex = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->CalulateGridIndexByLocation(CheckLocation);
+	APreBuilding* PreActor = Mgr->GetPreBuildingMeshActor(InCharacter);
+	if (!IsValid(PreActor))
+	{
+		return false;
+	}
+	//未激活状态下不允许建造
+	if (!Mgr->GetIsActive(InCharacter))
+	{
+		return false;
+	}
 
-	FVector StartLocation((GridIndex.X + 0.5) * GridWidth, (GridIndex.Y + 0.5) * GridWidth, GridHeight * 0.5);
+	UHB_GridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UHB_GridSubsystem>();
+	if (!GridSubsystem)
+	{
+		return false;
+	}
 
-	// 计算盒形范围
-	FVector HalfSize(GridWidth * 0.5f, GridWidth * 0.5f, GridHeight * 0.5f);
-
-	// 使用BoxTraceMultiByProfile检测盒形范围内的所有碰撞
-	FHitResult OutHit;
-	TArray<AActor*> ActorsToIgnore;
-
-	FName TraceProfile = FName("Construction");
-
-	if (UKismetSystemLibrary::BoxTraceSingleByProfile(
-		this,
-		StartLocation,
-		StartLocation,
-		HalfSize,
-		FRotator::ZeroRotator,
-		TraceProfile, // 使用指定碰撞profile
-		false, // bTraceComplex
-		ActorsToIgnore,
-		EDrawDebugTrace::None, // 不绘制调试线
-		OutHit,
-		true, // bIgnoreSelf
-		FLinearColor::Red,
-		FLinearColor::Green,
-		5.0f))
+	//以预览体当前位置反算 Grid 索引，查询是否已被占用（建筑/资源占用 → 不可建造）
+	const FVector CheckLocation = PreActor->GetActorLocation();
+	const FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(CheckLocation);
+	if (GridSubsystem->IsGridUsed(static_cast<int32>(GridIndex.X), static_cast<int32>(GridIndex.Y)))
 	{
 		return false;
 	}
 
 	return true;
 }
+
+AHB_ConstructionManager* UHB_ConstructionSubsystem::GetConstructionManager()
+{
+	return GetManager<AHB_ConstructionManager>();
+}
+

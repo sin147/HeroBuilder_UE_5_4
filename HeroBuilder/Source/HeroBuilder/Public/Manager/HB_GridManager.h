@@ -35,6 +35,7 @@ class HEROBUILDER_API AHB_GridManager : public AHB_Base_Manager
 private:
 	UPROPERTY(Replicated)
 	TArray<FGridInfo> UsedGridInfos;
+	UPROPERTY(Replicated)
 	TArray<FGridInfo> FreeGridInfos;
 public:
 	void CacheUsedGridInfo(int InX,int InY);

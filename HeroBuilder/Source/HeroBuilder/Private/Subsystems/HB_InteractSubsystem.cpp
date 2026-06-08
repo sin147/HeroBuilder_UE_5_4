@@ -202,11 +202,6 @@ void UHB_InteractSubsystem::SwitchInteractType(ACharacter* InCharacter, EInterac
 	{
 		return;
 	}
-	//模式即将切换：先中止角色当前正在进行的交互流程，避免旧动作/旧目标残留到新模式
-	if (UHB_CharacterSubsystem* CharSys = GetWorld()->GetSubsystem<UHB_CharacterSubsystem>())
-	{
-		CharSys->AbortInteract(InCharacter);
-	}
 	LeaveInteractType(InCharacter, CurrentMode);
 	EnterInteractType(InCharacter, NewMode);
 }
@@ -537,7 +532,17 @@ float UHB_InteractSubsystem::GetPreInteractDelay(ACharacter* InCharacter) const
 	return InteractData->GetPreInteractDelay(GetInteractMode(InCharacter), GetInteractType(InCharacter));
 }
 
+float UHB_InteractSubsystem::GetPreInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const
+{
+    return InteractData->GetPreInteractDelay(InteractMode, InteractType);
+}
+
 float UHB_InteractSubsystem::GetPostInteractDelay(ACharacter* InCharacter) const
 {
 	return InteractData->GetPostInteractDelay(GetInteractMode(InCharacter), GetInteractType(InCharacter));
+}
+
+float UHB_InteractSubsystem::GetPostInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const
+{
+    return InteractData->GetPostInteractDelay(InteractMode, InteractType);
 }

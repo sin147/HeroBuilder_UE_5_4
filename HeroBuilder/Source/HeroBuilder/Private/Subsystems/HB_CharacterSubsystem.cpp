@@ -157,10 +157,16 @@ void UHB_CharacterSubsystem::SwitchState(ACharacter* InCharacter, EPlayerCharact
 	}
 	if (CanSwitchState(InCharacter, NewState, CurrentState))
 	{
+
 		OnLeaveState(InCharacter, CurrentState);
+		Mgr->SetCurrentlyState(InCharacter, NewState);
 		OnEnterState(InCharacter, NewState);
 		//服务端权威路径：在 OnLeaveState/OnEnterState 内部已分别广播 Leave/Enter；这里补发 Changed
 		OnCharacterStateChanged.Broadcast(InCharacter, NewState, CurrentState);
+	}
+	else
+	{
+		AbortInteract(InCharacter);
 	}
 }
 
@@ -168,6 +174,11 @@ bool UHB_CharacterSubsystem::CanSwitchState(ACharacter* InCharacter, EPlayerChar
 {
 	//获取玩家当前交互模式
     const EInteractMode InteractMode = GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetInteractMode(InCharacter);
+	//打印当前和目标状态
+	const FString InteractModeName = StaticEnum<EInteractMode>()->GetNameStringByValue((int64)InteractMode);
+	const FString CurrentStateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)OldState);
+    const FString NewStateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)NewState);
+    UE_LOG(LogCharacterSubsystem, Log, TEXT("CanSwitchState:%s: %s -> %s"), *InteractModeName, *CurrentStateName, *NewStateName);
 	switch (InteractMode)
 	{
 	case IM_Normal:
@@ -208,11 +219,10 @@ bool UHB_CharacterSubsystem::CanSwitchState(ACharacter* InCharacter, EPlayerChar
 		case EPCS_PreInteract:
 		{
 			UHB_InteractSubsystem* InteractSys = GetWorld()->GetSubsystem<UHB_InteractSubsystem>();
-			if (InteractSys && InteractSys->GetInteractType(InCharacter) == IT_Construction)
+			if (InteractSys)
 			{
 				if (!GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>()->CheckCanConstruction(InCharacter))
 				{
-					SwitchState(InCharacter, EPCS_Idle);
 					return false;
 				}
 				return true;
@@ -230,8 +240,13 @@ bool UHB_CharacterSubsystem::CanSwitchState(ACharacter* InCharacter, EPlayerChar
 	default:
 		break;
 	}
-	
 	return true;
+}
+
+bool UHB_CharacterSubsystem::IsInteracting(AHeroBuilderCharacter* InCharacter)
+{
+	EPlayerCharacterState CurrentlyState = GetCurrentState(InCharacter);
+	return CurrentlyState==EPCS_Interact||CurrentlyState==EPCS_PostInteract||CurrentlyState==EPCS_PreInteract;
 }
 
 void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharacterState EnterState)
@@ -258,25 +273,17 @@ void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharac
 		break;
 	case EPCS_PreInteract:
 	{
-		if(GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetPreInteractDelay(InCharacter)<= 0.f)
-		{
-			//没有前摇时，直接进入交互
-			SwitchState(InCharacter, EPCS_Interact);
-		}
+		Cast<AHeroBuilderCharacter>(InCharacter)->OnStartInteract();
 		CharacterInteractTimer.FindOrAdd(InCharacter) = 0.f;
 		break;
 	}
 	case EPCS_Interact:
 	{
-
+		CharacterInteractTimer.FindOrAdd(InCharacter) = 0.f;
 		break;
 	}
 	case EPCS_PostInteract:
 	{
-        if (GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetPostInteractDelay(InCharacter) <= 0.f)
-		{
-			SwitchState(InCharacter, EPCS_PreInteract);
-        }
 		CharacterInteractTimer.FindOrAdd(InCharacter) = 0.f;
         break;
 	}
@@ -325,19 +332,18 @@ void UHB_CharacterSubsystem::OnLeaveState(ACharacter* InCharacter, EPlayerCharac
 		break;
 	}
 	case EPCS_PreInteract:
+		Cast<AHeroBuilderCharacter>(InCharacter)->OnEndInteract();
 		break;
 	case EPCS_Interact:
+		Cast<AHeroBuilderCharacter>(InCharacter)->OnEndInteract();
 		break;
 	case EPCS_PostInteract:
+		Cast<AHeroBuilderCharacter>(InCharacter)->OnEndInteract();
 		break;
 	default:
 		break;
 	}
 	const FString StateName = StaticEnum<EPlayerCharacterState>()->GetNameStringByValue((int64)LeaveState);
-	if (AHB_CharacterManager* Mgr = GetManager<AHB_CharacterManager>())
-	{
-		Mgr->SetCurrentlyState(InCharacter, EPCS_None);
-	}
 	UE_LOG(LogCharacterSubsystem, Log, TEXT("'%s' Leave State '%s'!"), *GetNameSafe(InCharacter), *StateName);
 	//服务端权威路径：直接广播 Leave（Enter 由 OnEnterState 负责，Changed 由 SwitchState 负责）
 	if (LeaveState != EPCS_None)
@@ -354,15 +360,6 @@ void UHB_CharacterSubsystem::AbortInteract(ACharacter* InCharacter)
 	}
 	AHB_CharacterManager* Mgr = GetCharacterManager();
 	if (!Mgr)
-	{
-		return;
-	}
-	const EPlayerCharacterState State = Mgr->GetCurrentlyState(InCharacter);
-	//只有处在交互流程中（追击/前摇/交互/后摇）才需要中止
-	if (State != EPCS_MoveToTarget &&
-		State != EPCS_PreInteract  &&
-		State != EPCS_Interact     &&
-		State != EPCS_PostInteract)
 	{
 		return;
 	}
@@ -538,11 +535,6 @@ void UHB_CharacterSubsystem::TickMoveToTarget(ACharacter* InCharacter, float Del
 		return;
 	}
 
-	//仅自治代理（即本地玩家控制的角色）才驱动客户端追击
-	if (InCharacter->GetLocalRole() != ROLE_AutonomousProxy && InCharacter->GetLocalRole() != ROLE_Authority)
-	{
-		return;
-	}
 	AHeroBuilderCharacter* HBChar = Cast<AHeroBuilderCharacter>(InCharacter);
 	if (!HBChar)
 	{
@@ -562,6 +554,11 @@ void UHB_CharacterSubsystem::TickMoveToTarget(ACharacter* InCharacter, float Del
 		return;
 	}
 
+	//仅自治代理（即本地玩家控制的角色）才驱动客户端追击
+	if (InCharacter->GetLocalRole() != ROLE_AutonomousProxy && InCharacter->GetLocalRole() != ROLE_Authority)
+	{
+		return;
+	}
 	//把世界空间下"朝向目标的XY单位向量"反算为玩家ControlRotation局部空间的(X=右, Y=前) 2D输入
 	const FVector DirXY = DeltaXY.GetSafeNormal();
 	FVector2D MoveInput2D(0.f, 1.f);
