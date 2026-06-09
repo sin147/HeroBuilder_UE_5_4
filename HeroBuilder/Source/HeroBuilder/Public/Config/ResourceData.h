@@ -13,13 +13,14 @@ class AHB_Resource_Base;
  * 资源类型
  */
 UENUM(BlueprintType)
-enum class EResourceType : uint8
+enum EResourceType : uint8
 {
 	RT_None UMETA(DisplayName = "None"),
 	RT_Wood UMETA(DisplayName = "Wood"),
 	RT_Stone UMETA(DisplayName = "Stone"),
 	RT_Iron UMETA(DisplayName = "Iron"),
 	RT_Gold UMETA(DisplayName = "Gold"),
+	RT_Food UMETA(DisplayName = "Food"),
 };
 
 /**
@@ -33,7 +34,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Resource", SimpleDisplay = "资源名称")
 	FString ResourceName;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Resource", SimpleDisplay = "资源类型")
-	EResourceType ResourceType = EResourceType::RT_None;
+	TEnumAsByte<EResourceType> ResourceType = EResourceType::RT_None;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Resource", SimpleDisplay = "生命值")
 	float Health = 100.f;
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Resource", SimpleDisplay = "脱战恢复延迟")
@@ -72,7 +73,7 @@ public:
 /**
  * 资源数据资产
  */
-UCLASS()
+UCLASS(BlueprintType)
 class HEROBUILDER_API UResourceData : public UDataAsset
 {
 	GENERATED_BODY()
@@ -80,6 +81,8 @@ class HEROBUILDER_API UResourceData : public UDataAsset
 private:
 	UPROPERTY(EditAnywhere, EditFixedSize, Category = "Resource", meta = (ReadOnlyKeys))
 	TMap<TSubclassOf<AHB_Resource_Base>, FResourceConfig> ResourceInfoMap;
+    UPROPERTY(EditAnywhere, EditFixedSize, Category = "Resource", meta = (DisplayName = "资源类型纹理映射", ReadOnlyKeys))
+    TMap<TEnumAsByte<EResourceType>, UTexture2D*> ResourceTypeTextureMap;
 
 	//资源生成配置列表
 	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "资源生成配置列表"))
@@ -103,6 +106,8 @@ public:
 	FVector GetSpawnAreaCenter() const { return SpawnAreaCenter; }
 	FVector GetSpawnAreaExtent() const { return SpawnAreaExtent; }
 	float GetSpawnRadiusAroundPlayer() const { return SpawnRadiusAroundPlayer; }
+	UFUNCTION(BlueprintPure)
+	UTexture2D* GetResourceTypeTexture(EResourceType ResourceType) const;
 
 #if WITH_EDITOR
 protected:
@@ -112,5 +117,7 @@ protected:
 private:
 	//扫描所有AHB_Resource_Base子类并同步到ResourceInfoMap
 	void RefreshResourceInfoMap();
+	//扫描EResourceType所有枚举值并同步到ResourceTypeTextureMap
+	void RefreshResourceTypeTextureMap();
 #endif
 };

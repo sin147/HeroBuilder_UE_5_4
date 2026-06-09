@@ -23,12 +23,25 @@ FResourceConfig UResourceData::GetResourceInfoByResourceClass(TSubclassOf<AHB_Re
 }
 
 #if WITH_EDITOR
+UTexture2D* UResourceData::GetResourceTypeTexture(EResourceType ResourceType) const
+{
+	if (ResourceTypeTextureMap.Contains(ResourceType))
+	{
+		return ResourceTypeTextureMap[ResourceType];
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ResourceData: GetResourceTypeTexture: ResourceType not found"));
+	}
+	return nullptr;
+}
 void UResourceData::PostInitProperties()
 {
 	Super::PostInitProperties();
 	if (!HasAnyFlags(RF_ClassDefaultObject | RF_NeedLoad | RF_NeedPostLoad))
 	{
 		RefreshResourceInfoMap();
+		RefreshResourceTypeTextureMap();
 	}
 }
 
@@ -36,6 +49,7 @@ void UResourceData::PostLoad()
 {
 	Super::PostLoad();
 	RefreshResourceInfoMap();
+	RefreshResourceTypeTextureMap();
 }
 
 void UResourceData::RefreshResourceInfoMap()
@@ -124,6 +138,73 @@ void UResourceData::RefreshResourceInfoMap()
 		if (!ResourceInfoMap.Contains(ResourceClass))
 		{
 			ResourceInfoMap.Add(ResourceClass, FResourceConfig());
+			bChanged = true;
+		}
+	}
+
+	if (bChanged)
+	{
+		MarkPackageDirty();
+	}
+}
+
+void UResourceData::RefreshResourceTypeTextureMap()
+{
+	UEnum* EnumPtr = StaticEnum<EResourceType>();
+	if (!EnumPtr)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ResourceData: 无法获取EResourceType的UEnum"));
+		return;
+	}
+
+	// 收集当前枚举的所有合法值（跳过 _MAX 哨兵）
+	TSet<EResourceType> AllResourceTypes;
+	const int32 NumEnums = EnumPtr->NumEnums();
+	for (int32 i = 0; i < NumEnums; ++i)
+	{
+		// 跳过编译器自动生成的 _MAX 项
+		if (EnumPtr->ContainsExistingMax() && i == NumEnums - 1)
+		{
+			continue;
+		}
+		const int64 Value = EnumPtr->GetValueByIndex(i);
+		AllResourceTypes.Add(static_cast<EResourceType>(Value));
+	}
+
+	bool bChanged = false;
+
+	// 主动剔除非法/重复Key（与ResourceInfoMap一致的清理逻辑）
+	TSet<EResourceType> SeenTypes;
+	for (auto It = ResourceTypeTextureMap.CreateIterator(); It; ++It)
+	{
+		const EResourceType KeyType = It.Key();
+
+		// 异常/不再合法的Key
+		if (!AllResourceTypes.Contains(KeyType))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ResourceData: 剔除非法ResourceType Key %d"), static_cast<int32>(KeyType));
+			It.RemoveCurrent();
+			bChanged = true;
+			continue;
+		}
+
+		// 重复Key（保险逻辑）
+		bool bAlreadySeen = false;
+		SeenTypes.Add(KeyType, &bAlreadySeen);
+		if (bAlreadySeen)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ResourceData: 剔除重复ResourceType Key %d"), static_cast<int32>(KeyType));
+			It.RemoveCurrent();
+			bChanged = true;
+		}
+	}
+
+	// 添加新出现的枚举值（已存在的保留原纹理）
+	for (const EResourceType& Type : AllResourceTypes)
+	{
+		if (!ResourceTypeTextureMap.Contains(Type))
+		{
+			ResourceTypeTextureMap.Add(Type, nullptr);
 			bChanged = true;
 		}
 	}

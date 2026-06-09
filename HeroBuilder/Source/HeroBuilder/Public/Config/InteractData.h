@@ -61,7 +61,7 @@ public:
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType)
 class HEROBUILDER_API UInteractData : public UDataAsset
 {
 	GENERATED_BODY()

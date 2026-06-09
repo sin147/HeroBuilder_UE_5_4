@@ -39,7 +39,7 @@ public:
 /**
  * 敌人数据资产
  */
-UCLASS()
+UCLASS(BlueprintType)
 class HEROBUILDER_API UEnemyData : public UDataAsset
 {
 	GENERATED_BODY()

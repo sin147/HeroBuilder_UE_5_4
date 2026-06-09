@@ -39,7 +39,7 @@ public:
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType)
 class HEROBUILDER_API UWaveData : public UDataAsset
 {
 	GENERATED_BODY()

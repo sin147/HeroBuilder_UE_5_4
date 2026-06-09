@@ -80,56 +80,42 @@ void UHB_ConstructionSubsystem::SwitchBuilding(ACharacter* InOwnerCharacter, TSu
 
 void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
 {
-	// 建造逻辑仅在权威端执行
-	if (NetMode == NM_Client)
+	//公共前置：可建造性 + 必要依赖 + Grid 索引（客户端/服务端均需要）
+	if (!CheckCanConstruction(InCharacter))
 	{
-		//——客户端"乐观预占位"——
-		//服务端 SpawnBuilding 后会通过 OnSpawnBuilding 占位并 Replicate 回来，但中间存在一次 RTT 窗口。
-		//为了避免该窗口内玩家在同一格再次触发建造，这里先做本地校验+本地预占位：
-		//  1) 必须先通过 CheckCanConstruction（避免占到已经被同步过来的占用格上）
-		//  2) 通过则把目标 Grid 写入本地 UsedGridInfos，等服务端权威值到达时会自动覆盖刷新
-		if (!CheckCanConstruction(InCharacter))
-		{
-			return;
-		}
-		AHB_ConstructionManager* Mgr = GetConstructionManager();
-		if (!Mgr)
-		{
-			return;
-		}
-		APreBuilding* PreActor = Mgr->GetPreBuildingMeshActor(InCharacter);
-		if (!IsValid(PreActor))
-		{
-			return;
-		}
-		UHB_GridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UHB_GridSubsystem>();
-		if (!GridSubsystem)
-		{
-			return;
-		}
-		const FVector PreviewLocation = PreActor->GetActorLocation();
-		const FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(PreviewLocation);
-		GridSubsystem->OccupyGrid(static_cast<int32>(GridIndex.X), static_cast<int32>(GridIndex.Y));
 		return;
 	}
-	if (CheckCanConstruction(InCharacter))
+	AHB_ConstructionManager* Mgr = GetConstructionManager();
+	UHB_GridSubsystem* GridSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UHB_GridSubsystem>() : nullptr;
+	if (!Mgr || !GridSubsystem)
 	{
-		AHB_ConstructionManager* Mgr = GetConstructionManager();
-		if (!Mgr)
-		{
-			return;
-		}
-		APreBuilding* TargetPreStaticMeshActor = Mgr->GetPreBuildingMeshActor(InCharacter);
-		TSubclassOf<AHB_Building_Base> BuildingClass = Mgr->GetBuildingClass(InCharacter);
-		if (!IsValid(TargetPreStaticMeshActor) || !IsValid(BuildingClass))
-		{
-			return;
-		}
-		GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuilding(
-			BuildingClass,
-			FTransform(TargetPreStaticMeshActor->GetActorRotation(), TargetPreStaticMeshActor->GetActorLocation(), TargetPreStaticMeshActor->GetActorScale()));
-		UE_LOG(LogConstructionSubsystem, Log, TEXT("ConstructionBegin: spawn building"));
+		return;
 	}
+	APreBuilding* PreActor = Mgr->GetPreBuildingMeshActor(InCharacter);
+	if (!IsValid(PreActor))
+	{
+		return;
+	}
+	const FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(PreActor->GetActorLocation());
+	const int32 GX = static_cast<int32>(GridIndex.X);
+	const int32 GY = static_cast<int32>(GridIndex.Y);
+
+	//客户端"乐观预占位"：本地先占位，等服务端权威 Replicate 回来时自动覆盖刷新
+	if (NetMode == NM_Client)
+	{
+		GridSubsystem->OccupyGrid(GX, GY);
+		return;
+	}
+
+	//服务端：走 BuildingSubsystem 的 Grid 版接口生成建筑
+	TSubclassOf<AHB_Building_Base> BuildingClass = Mgr->GetBuildingClass(InCharacter);
+	if (!IsValid(BuildingClass))
+	{
+		return;
+	}
+	GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuildingAtGrid(
+		BuildingClass, GX, GY, PreActor->GetActorRotation(), PreActor->GetActorScale());
+	UE_LOG(LogConstructionSubsystem, Log, TEXT("ConstructionBegin: spawn building"));
 }
 
 void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter)
@@ -275,9 +261,10 @@ bool UHB_ConstructionSubsystem::CheckCanConstruction(ACharacter* InCharacter)
 	const FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(CheckLocation);
 	if (GridSubsystem->IsGridUsed(static_cast<int32>(GridIndex.X), static_cast<int32>(GridIndex.Y)))
 	{
+		UE_LOG(LogConstructionSubsystem, Warning, TEXT("CheckCanConstruction: false"));
 		return false;
 	}
-
+	UE_LOG(LogConstructionSubsystem, Log, TEXT("CheckCanConstruction: true"));
 	return true;
 }
 

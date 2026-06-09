@@ -39,6 +39,8 @@ public:
 	/*************************************外部接口*****************************************/
 	//生成建筑
 	void SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass, const FTransform& InTransform);
+	//以Grid坐标(X,Y)生成建筑：内部根据GridSubsystem格宽，把(X,Y)还原为格子中心的世界坐标后调用SpawnBuilding
+	void SpawnBuildingAtGrid(TSubclassOf<AHB_Building_Base> InClass, int32 InX, int32 InY, const FRotator& InRotation = FRotator::ZeroRotator, const FVector& InScale = FVector(1.f, 1.f, 1.f));
 	//销毁建筑
 	void DestroyBuilding(AHB_Building_Base* InBuilding);
 	//寻找目标

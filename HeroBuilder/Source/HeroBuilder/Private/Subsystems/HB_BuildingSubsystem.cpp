@@ -6,6 +6,7 @@
 #include "Enemy/HB_Enemy_Base.h"
 #include "Manager/HB_BuildingManager.h"
 #include "Subsystems/HB_EnemySubsystem.h"
+#include "Subsystems/HB_GridSubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogBuildingSystem);
 
@@ -141,6 +142,38 @@ void UHB_BuildingSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass
 	DeferredBuilding->FinishSpawning(InTransform);
 
 	OnSpawnBuilding.Broadcast(DeferredBuilding, InTransform);
+}
+
+void UHB_BuildingSubsystem::SpawnBuildingAtGrid(TSubclassOf<AHB_Building_Base> InClass, int32 InX, int32 InY, const FRotator& InRotation, const FVector& InScale)
+{
+	//仅服务端生成建筑（与 SpawnBuilding 行为一致；提前拦截可省去无谓的坐标计算）
+	if (NetMode == ENetMode::NM_Client)
+	{
+		return;
+	}
+
+	if (!InClass)
+	{
+		UE_LOG(LogBuildingSystem, Warning, TEXT("SpawnBuildingAtGrid: null class"));
+		return;
+	}
+
+	UHB_GridSubsystem* GridSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UHB_GridSubsystem>() : nullptr;
+	if (!GridSubsystem)
+	{
+		UE_LOG(LogBuildingSystem, Warning, TEXT("SpawnBuildingAtGrid: GridSubsystem not ready"));
+		return;
+	}
+
+	//Grid(X,Y) → 世界坐标（取格子中心，Z 默认 0，与现有 TickPreviewBuildingPos 一致）
+	const float GridWidth = static_cast<float>(GridSubsystem->GetGridWidth());
+	const FVector SpawnLocation(
+		GridWidth * InX + GridWidth * 0.5f,
+		GridWidth * InY + GridWidth * 0.5f,
+		0.f);
+
+	const FTransform SpawnTransform(InRotation, SpawnLocation, InScale);
+	SpawnBuilding(InClass, SpawnTransform);
 }
 
 void UHB_BuildingSubsystem::DestroyBuilding(AHB_Building_Base*InBuilding)

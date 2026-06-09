@@ -32,11 +32,13 @@ void AHB_ResourceManager::AddResourceAmount(EResourceType InType, int32 InAmount
 		return;
 	}
 
-	for (FResourceAmountEntry& Entry : ResourceAmountList)
+	for (FResourceAmountEntry& Entry : ResourceWarehouse.ResourceAmountList)
 	{
 		if (Entry.ResourceType == InType)
 		{
 			Entry.Amount += InAmount;
+			//FastArray：修改条目后必须标脏，否则不会触发差量复制
+			ResourceWarehouse.MarkItemDirty(Entry);
 			return;
 		}
 	}
@@ -44,7 +46,9 @@ void AHB_ResourceManager::AddResourceAmount(EResourceType InType, int32 InAmount
 	FResourceAmountEntry NewEntry;
 	NewEntry.ResourceType = InType;
 	NewEntry.Amount = InAmount;
-	ResourceAmountList.Add(NewEntry);
+	const int32 Idx = ResourceWarehouse.ResourceAmountList.Add(NewEntry);
+	//FastArray：新增条目同样需要标脏
+	ResourceWarehouse.MarkItemDirty(ResourceWarehouse.ResourceAmountList[Idx]);
 }
 
 bool AHB_ResourceManager::ConsumeResourceAmount(EResourceType InType, int32 InAmount)
@@ -54,7 +58,7 @@ bool AHB_ResourceManager::ConsumeResourceAmount(EResourceType InType, int32 InAm
 		return false;
 	}
 
-	for (FResourceAmountEntry& Entry : ResourceAmountList)
+	for (FResourceAmountEntry& Entry : ResourceWarehouse.ResourceAmountList)
 	{
 		if (Entry.ResourceType == InType)
 		{
@@ -63,6 +67,8 @@ bool AHB_ResourceManager::ConsumeResourceAmount(EResourceType InType, int32 InAm
 				return false;
 			}
 			Entry.Amount -= InAmount;
+			//FastArray：扣减后标脏触发差量复制
+			ResourceWarehouse.MarkItemDirty(Entry);
 			return true;
 		}
 	}
@@ -71,7 +77,7 @@ bool AHB_ResourceManager::ConsumeResourceAmount(EResourceType InType, int32 InAm
 
 int32 AHB_ResourceManager::GetResourceAmount(EResourceType InType) const
 {
-	for (const FResourceAmountEntry& Entry : ResourceAmountList)
+	for (const FResourceAmountEntry& Entry : ResourceWarehouse.ResourceAmountList)
 	{
 		if (Entry.ResourceType == InType)
 		{
@@ -85,5 +91,5 @@ void AHB_ResourceManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHB_ResourceManager, Resources);
-	DOREPLIFETIME(AHB_ResourceManager, ResourceAmountList);
+	DOREPLIFETIME(AHB_ResourceManager, ResourceWarehouse);
 }

@@ -62,8 +62,15 @@ bool AHB_Resource_Base::SwitchState(EResourceState NewState)
 	{
 		return false;
 	}
-	UE_LOG(LogResource, Log, TEXT("SwitchState %s"), *GetStateName(NewState));
+	UE_LOG(LogResource, Log, TEXT("SwitchState %s -> %s"), *GetStateName(CurrentState), *GetStateName(NewState));
+
+	const EResourceState OldState = CurrentState;
+	//先派发离开原状态（蓝图可重写）
+	OnLeaveState(OldState);
+	//再落表为新状态
 	CurrentState = NewState;
+	//最后派发进入新状态（蓝图可重写）
+	OnEnterState(NewState);
 	return true;
 }
 
@@ -95,21 +102,50 @@ void AHB_Resource_Base::BeginPlay()
 	}
 }
 
+void AHB_Resource_Base::OnEnterState(EResourceState EnterState)
+{
+	switch (EnterState)
+	{
+	case RS_Idle:
+		break;
+	case RS_BeHit:
+		break;
+	case RS_Recover:
+		break;
+	case RS_Death:
+		OnDeath();
+		break;
+	default:
+		break;
+	}
+}
+
+void AHB_Resource_Base::OnLeaveState(EResourceState LeaveState)
+{
+	switch (LeaveState)
+	{
+	case RS_Idle:
+		break;
+	case RS_BeHit:
+		break;
+	case RS_Recover:
+		break;
+	case RS_Death:
+		break;
+	default:
+		break;
+	}
+}
+
 void AHB_Resource_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
-	// 先在服务端处理血量变化逻辑
-	if (HasAuthority())
-	{
 		// 被打且未死亡 -> 进入受击状态
 		if (NewHealth < OldHealth && NewHealth > 0.f)
 		{
 			CurrentBeHitDuration = BeHitDuration;
 			CurrentRecoverDelay = RecoverDelay;
 			SwitchState(RS_BeHit);
-			OnBeHit(Attacker);
 		}
-	}
-
 	// 调用蓝图可重写的 OnHealthChanged 接口
 	OnHealthChanged(OldHealth, NewHealth, MaxHealthValue, Attacker);
 }
@@ -122,7 +158,6 @@ void AHB_Resource_Base::HandleDeath(AActor* Attacker)
 	{
 		InteractComponent->SetIsInteractable(false);
 	}
-	OnDeath();
 
 	// 通知子系统处理资源掉落与销毁
 	if (UHB_ResourceSubsystem* ResourceSubsystem = GetWorld()->GetSubsystem<UHB_ResourceSubsystem>())
@@ -152,7 +187,6 @@ void AHB_Resource_Base::Tick(float DeltaTime)
 			if (CurrentRecoverDelay <= 0.f)
 			{
 				SwitchState(RS_Recover);
-				OnRecover();
 			}
 		}
 		break;

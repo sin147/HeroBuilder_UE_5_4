@@ -63,7 +63,7 @@ private:
 
 	//资源类型
 	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
-	EResourceType ResourceType = EResourceType::RT_None;
+	TEnumAsByte<EResourceType> ResourceType = EResourceType::RT_None;
 
 	//死亡时掉落的资源数量
 	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
@@ -129,6 +129,10 @@ protected:
 	//死亡表现
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnDeath();
+
+	void OnEnterState(EResourceState EnterState);
+
+	void OnLeaveState(EResourceState LeaveState);
 
 	/** 由DamageComponent委托回调：血量变化 */
 	UFUNCTION()

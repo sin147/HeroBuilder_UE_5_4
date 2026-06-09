@@ -9,7 +9,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType)
 class HEROBUILDER_API UGridData : public UDataAsset
 {
 	GENERATED_BODY()

@@ -315,11 +315,8 @@ void AHeroBuilderCharacter::Multicast_BeginInteract_Implementation()
 void AHeroBuilderCharacter::OnInteractReleased(const FInputActionValue& Value)
 {
 	ENetMode NetMode = GetNetMode();
-	if (GetNetMode() == NM_Client || GetNetMode() == NM_DedicatedServer)
-	{
         Server_AbortInteract();
         //Client_AbortInteract();
-    }
 }
 
 void AHeroBuilderCharacter::Multicast_AbortInteract_Implementation()

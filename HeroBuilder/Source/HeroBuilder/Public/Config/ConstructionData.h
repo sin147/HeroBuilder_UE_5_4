@@ -10,7 +10,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType)
 class HEROBUILDER_API UConstructionData : public UDataAsset
 {
 	GENERATED_BODY()
