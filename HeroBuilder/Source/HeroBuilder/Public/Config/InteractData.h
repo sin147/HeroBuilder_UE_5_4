@@ -4,27 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Types/HB_Enums.h"
 #include "InteractData.generated.h"
-UENUM(BlueprintType)
-enum EInteractType :uint8
-{
-	IT_None UMETA(DisplayName = "无"),
-	IT_Normal UMETA(DisplayName = "正常类型"),
-    IT_Construction UMETA(DisplayName = "建造类型"),
-    IT_Lumber UMETA(DisplayName = "砍伐类型"),
-    IT_Gather UMETA(DisplayName = "采集类型"),
-    IT_Mine UMETA(DisplayName = "挖掘类型"),
-    IT_Attack UMETA(DisplayName = "攻击类型"),
-};
-
-//与角色交互模式（建造模式开关）保持一致的枚举
-//放在这里以便InteractData作为基础数据可直接使用，避免循环依赖
-UENUM(BlueprintType)
-enum EInteractMode :uint8
-{
-	IM_Normal UMETA(DisplayName = "正常"),
-	IM_Construction UMETA(DisplayName = "建筑模式"),
-};
 
 USTRUCT(BlueprintType)
 struct FInteractInfo

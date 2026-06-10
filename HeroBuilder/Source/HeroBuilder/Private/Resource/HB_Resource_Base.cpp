@@ -52,6 +52,10 @@ FString AHB_Resource_Base::GetStateName(EResourceState State)
 	}
 }
 
+void AHB_Resource_Base::OnRep_CurrentlyState()
+{
+}
+
 bool AHB_Resource_Base::SwitchState(EResourceState NewState)
 {
 	if (CurrentState == RS_Death)
@@ -65,12 +69,17 @@ bool AHB_Resource_Base::SwitchState(EResourceState NewState)
 	UE_LOG(LogResource, Log, TEXT("SwitchState %s -> %s"), *GetStateName(CurrentState), *GetStateName(NewState));
 
 	const EResourceState OldState = CurrentState;
-	//先派发离开原状态（蓝图可重写）
-	OnLeaveState(OldState);
-	//再落表为新状态
+	// 先记录旧状态再切换，供上层随时查询
+	LastState = OldState;
+	// 落表为新状态（服务端会触发复制 → 客户端 OnRep_CurrentlyState）
 	CurrentState = NewState;
-	//最后派发进入新状态（蓝图可重写）
-	OnEnterState(NewState);
+
+	// 服务端等价 OnRep 派发（服务端不会触发自身的 ReplicatedUsing 回调）
+	//if (HasAuthority())
+	//{
+		OnLeaveState(OldState);
+		OnEnterState(NewState);
+//	}
 	return true;
 }
 
@@ -91,19 +100,12 @@ void AHB_Resource_Base::BeginPlay()
 		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Resource_Base::HandleHealthChanged);
 		DamageComponent->OnDeath.AddDynamic(this, &AHB_Resource_Base::HandleDeath);
 	}
-
-	if (HasAuthority())
-	{
-		if (DamageComponent)
-		{
-			DamageComponent->InitHealth(MaxHealth);
-		}
-		CurrentState = RS_Idle;
-	}
 }
 
 void AHB_Resource_Base::OnEnterState(EResourceState EnterState)
 {
+
+	UE_LOG(LogResource, Log, TEXT("OnEnterState %s"), *GetStateName(EnterState));
 	switch (EnterState)
 	{
 	case RS_Idle:
@@ -113,8 +115,10 @@ void AHB_Resource_Base::OnEnterState(EResourceState EnterState)
 	case RS_Recover:
 		break;
 	case RS_Death:
-		OnDeath();
+	{
+
 		break;
+	}
 	default:
 		break;
 	}
@@ -139,6 +143,8 @@ void AHB_Resource_Base::OnLeaveState(EResourceState LeaveState)
 
 void AHB_Resource_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
+		// 调用蓝图可重写的 OnHealthChanged 接口
+		OnHealthChanged(OldHealth, NewHealth, MaxHealthValue, Attacker);
 		// 被打且未死亡 -> 进入受击状态
 		if (NewHealth < OldHealth && NewHealth > 0.f)
 		{
@@ -146,13 +152,13 @@ void AHB_Resource_Base::HandleHealthChanged(float OldHealth, float NewHealth, fl
 			CurrentRecoverDelay = RecoverDelay;
 			SwitchState(RS_BeHit);
 		}
-	// 调用蓝图可重写的 OnHealthChanged 接口
-	OnHealthChanged(OldHealth, NewHealth, MaxHealthValue, Attacker);
+
 }
 
 void AHB_Resource_Base::HandleDeath(AActor* Attacker)
 {
 	SwitchState(RS_Death);
+	OnDeath();
 	// 死亡后不再吸引玩家切换交互类型
 	if (InteractComponent)
 	{
@@ -237,17 +243,23 @@ void AHB_Resource_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHB_Resource_Base, CurrentState);
+	DOREPLIFETIME(AHB_Resource_Base, LastState);
+	//以下字段由服务端 SpawnResource → InitialResource 写入，客户端只在Actor首次复制时同步一次，运行期不再变化
+	DOREPLIFETIME_CONDITION(AHB_Resource_Base, RecoverDelay, COND_InitialOnly);
+	DOREPLIFETIME_CONDITION(AHB_Resource_Base, RecoverSpeed, COND_InitialOnly);
+	DOREPLIFETIME_CONDITION(AHB_Resource_Base, BeHitDuration, COND_InitialOnly);
+	DOREPLIFETIME_CONDITION(AHB_Resource_Base, DeathTime, COND_InitialOnly);
+	DOREPLIFETIME_CONDITION(AHB_Resource_Base, ResourceType, COND_InitialOnly);
+	DOREPLIFETIME_CONDITION(AHB_Resource_Base, ResourceAmount, COND_InitialOnly);
 }
 
 void AHB_Resource_Base::InitialResource(const FResourceConfig& InConfig)
 {
 	UE_LOG(LogResource, Log, TEXT("Initializing resource - Name: %s, Type: %d, Health: %.1f, Amount: %d"),
 		*InConfig.ResourceName, static_cast<int32>(InConfig.ResourceType), InConfig.Health, InConfig.ResourceAmount);
-
-	MaxHealth = InConfig.Health;
 	if (DamageComponent)
 	{
-		DamageComponent->InitHealth(MaxHealth);
+		DamageComponent->InitHealth(InConfig.Health);
 	}
 	RecoverDelay = InConfig.RecoverDelay;
 	RecoverSpeed = InConfig.RecoverSpeed;

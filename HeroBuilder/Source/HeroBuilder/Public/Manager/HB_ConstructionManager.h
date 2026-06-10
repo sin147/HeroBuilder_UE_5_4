@@ -39,6 +39,9 @@ public:
 	UPROPERTY()
 	bool bIsActive = false;
 
+	UPROPERTY()
+	bool bActiveTickPos = true;
+
 	//—— FastArray 客户端回调 ——
 	void PreReplicatedRemove(const FFastArraySerializer& ArraySerializer);
 	void PostReplicatedAdd(const FFastArraySerializer& ArraySerializer);
@@ -96,6 +99,8 @@ public:
 	//—— 激活状态 ——
 	bool GetIsActive(ACharacter* InCharacter) const;
 	void SetIsActive(ACharacter* InCharacter, bool bInActive);
+	bool GetActiveTickPos(ACharacter* InCharacter) const;
+	void SetActiveTickPos(ACharacter* InCharacter, bool bInActive);
 
 	//是否存在该角色的Entry
 	bool HasEntry(ACharacter* InCharacter) const;

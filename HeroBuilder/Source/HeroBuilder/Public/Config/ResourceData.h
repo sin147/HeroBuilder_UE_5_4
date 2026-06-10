@@ -5,23 +5,10 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Config/InteractData.h"
+#include "Types/HB_Enums.h"
 #include "ResourceData.generated.h"
 
 class AHB_Resource_Base;
-
-/**
- * 资源类型
- */
-UENUM(BlueprintType)
-enum EResourceType : uint8
-{
-	RT_None UMETA(DisplayName = "None"),
-	RT_Wood UMETA(DisplayName = "Wood"),
-	RT_Stone UMETA(DisplayName = "Stone"),
-	RT_Iron UMETA(DisplayName = "Iron"),
-	RT_Gold UMETA(DisplayName = "Gold"),
-	RT_Food UMETA(DisplayName = "Food"),
-};
 
 /**
  * 资源配置结构体

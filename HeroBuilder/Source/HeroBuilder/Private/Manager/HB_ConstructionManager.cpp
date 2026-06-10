@@ -194,6 +194,30 @@ void AHB_ConstructionManager::SetIsActive(ACharacter* InCharacter, bool bInActiv
 	PreBuildingContainer.MarkItemDirty(Entry);
 }
 
+bool AHB_ConstructionManager::GetActiveTickPos(ACharacter* InCharacter) const
+{
+	if (const FPreBuildingInfo* Entry = FindEntry(InCharacter))
+	{
+		return Entry->bActiveTickPos;
+	}
+	return false;
+}
+
+void AHB_ConstructionManager::SetActiveTickPos(ACharacter* InCharacter, bool bInActive)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	FPreBuildingInfo& Entry = FindOrAddEntry(InCharacter);
+	if (Entry.bActiveTickPos == bInActive)
+	{
+		return;
+	}
+	Entry.bActiveTickPos = bInActive;
+	PreBuildingContainer.MarkItemDirty(Entry);
+}
+
 void AHB_ConstructionManager::RemoveEntry(ACharacter* InCharacter)
 {
 	if (!InCharacter)

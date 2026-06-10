@@ -5,7 +5,6 @@
 #include "Subsystems/HB_BuildingSubsystem.h"
 #include "Subsystems/HB_GridSubsystem.h"
 #include "Subsystems/HB_CharacterSubsystem.h"
-#include "Manager/HB_ConstructionManager.h"
 #include "Camera/CameraComponent.h"
 #include "../HeroBuilderCharacter.h"
 #include "Building/HB_Building_Base.h"
@@ -36,6 +35,8 @@ void UHB_ConstructionSubsystem::PostInitialize()
 	GridWidth = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridWidth();
 	GridHeight = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridHeight();
 	NetMode = GetWorld()->GetNetMode();
+    GetWorld()->GetSubsystem<UHB_CharacterSubsystem>()->OnCharacterEnterState.AddDynamic(this, &UHB_ConstructionSubsystem::OnCharacterEnterState);
+	GetWorld()->GetSubsystem<UHB_CharacterSubsystem>()->OnCharacterLeaveState.AddDynamic(this, &UHB_ConstructionSubsystem::OnCharacterLeaveState);
 }
 
 void UHB_ConstructionSubsystem::Tick(float DeltaTime)
@@ -106,16 +107,31 @@ void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
 		GridSubsystem->OccupyGrid(GX, GY);
 		return;
 	}
+	else
+	{
 
-	//服务端：走 BuildingSubsystem 的 Grid 版接口生成建筑
-	TSubclassOf<AHB_Building_Base> BuildingClass = Mgr->GetBuildingClass(InCharacter);
-	if (!IsValid(BuildingClass))
+		//服务端：走 BuildingSubsystem 的 Grid 版接口生成建筑
+		TSubclassOf<AHB_Building_Base> BuildingClass = Mgr->GetBuildingClass(InCharacter);
+		if (!IsValid(BuildingClass))
+		{
+			return;
+		}
+		GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuildingAtGrid(
+			BuildingClass, GX, GY, PreActor->GetActorRotation(), PreActor->GetActorScale());
+		UE_LOG(LogConstructionSubsystem, Log, TEXT("ConstructionBegin: spawn building"));
+	}
+
+}
+
+void UHB_ConstructionSubsystem::SetEnablePreviewBuildingPos(ACharacter* InCharacter, bool bEnable)
+{
+	AHB_ConstructionManager* Mgr = GetConstructionManager();
+	if (!Mgr)
 	{
 		return;
 	}
-	GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuildingAtGrid(
-		BuildingClass, GX, GY, PreActor->GetActorRotation(), PreActor->GetActorScale());
-	UE_LOG(LogConstructionSubsystem, Log, TEXT("ConstructionBegin: spawn building"));
+	Mgr->SetActiveTickPos(InCharacter, bEnable);
+	
 }
 
 void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter)
@@ -207,7 +223,7 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 	for (const FPreBuildingInfo& Entry : Entries)
 	{
 		//未激活状态跳过：隐藏中的预览体不需要跟随镜头更新位置
-		if (!Entry.bIsActive)
+        if (!Entry.bIsActive || !Entry.bActiveTickPos)
 		{
 			continue;
 		}
@@ -230,6 +246,22 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 		FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(PreviewLocation);
 		BuildingMeshActor->SetActorLocation(FVector(GridWidth * GridIndex.X + GridWidth / 2, GridWidth * GridIndex.Y + GridWidth / 2, 0));
 	}
+}
+
+void UHB_ConstructionSubsystem::OnCharacterEnterState(ACharacter* InCharacter, EPlayerCharacterState InState)
+{
+	if (InState == EPlayerCharacterState::EPCS_PreInteract)
+	{
+		SetEnablePreviewBuildingPos(InCharacter, false);
+	}
+}
+
+void UHB_ConstructionSubsystem::OnCharacterLeaveState(ACharacter* InCharacter, EPlayerCharacterState InState)
+{
+    if (InState == EPlayerCharacterState::EPCS_Idle||InState == EPlayerCharacterState::EPCS_Interact)
+    {
+        SetEnablePreviewBuildingPos(InCharacter, true);
+    }
 }
 
 bool UHB_ConstructionSubsystem::CheckCanConstruction(ACharacter* InCharacter)

@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
 #include "Components/WidgetComponent.h"
+#include "Types/HB_Enums.h"
 #include "HB_Building_Base.generated.h"
 
 class UHB_DamageComponent;
@@ -17,17 +18,6 @@ DECLARE_LOG_CATEGORY_EXTERN(LogBuilding, Log, All);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnBuildingHealthChangedDelegate, float, OldHealth, float, NewHealth, float, MaxHealth, AActor*, Attacker);
 
 struct FBuildingConfig;
-
-UENUM(BlueprintType)
-enum EBuildingState : uint8
-{
-	BS_Idle UMETA(DisplayName = "Idle"),
-	BS_Rotate UMETA(DisplayName = "Rotate"),
-	BS_PreAttack UMETA(DisplayName = "PreAttack"),
-	BS_Attack UMETA(DisplayName = "Attack"),
-	BS_PostAttack UMETA(DisplayName = "PostAttack"),
-	BS_Death UMETA(DisplayName = "Death"),
-};
 
 UCLASS(Abstract)
 class HEROBUILDER_API AHB_Building_Base : public AActor

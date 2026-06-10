@@ -211,7 +211,7 @@ void UHB_ResourceSubsystem::TickSpawnResource()
 				UE_LOG(LogResourceSubsystem, Log, TEXT("Spawning resource - Class: %s, Location: %s"),
 					*OutItem.Key->GetName(), *OutItem.Value.GetLocation().ToString());
 
-				TObjectPtr<AHB_Resource_Base> DeferredResource = GetWorld()->SpawnActorDeferred<AHB_Resource_Base>(OutItem.Key, OutItem.Value);
+				TObjectPtr<AHB_Resource_Base> DeferredResource = GetWorld()->SpawnActor<AHB_Resource_Base>(OutItem.Key, OutItem.Value);
 				if (IsValid(DeferredResource))
 				{
 					if (IsValid(ResourceData))
@@ -226,7 +226,6 @@ void UHB_ResourceSubsystem::TickSpawnResource()
 					}
 
 					GetManager<AHB_ResourceManager>()->AddResource(DeferredResource);
-					DeferredResource->FinishSpawning(OutItem.Value);
 					UE_LOG(LogResourceSubsystem, Log, TEXT("Successfully spawned resource: %s"), *DeferredResource->GetName());
 
 					OnSpawnResource.Broadcast(DeferredResource, OutItem.Value);

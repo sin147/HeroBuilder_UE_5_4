@@ -10,19 +10,6 @@
 class ACharacter;
 class AActor;
 
-//玩家角色状态枚举（从HeroBuilderCharacter迁移至此，便于Manager/Subsystem访问）
-UENUM(BlueprintType)
-enum EPlayerCharacterState :uint8
-{
-	EPCS_None UMETA(DisplayName = "无"),
-	EPCS_Idle UMETA(DisplayName = "空闲"),
-	EPCS_Move UMETA(DisplayName = "移动"),
-	EPCS_MoveToTarget UMETA(DisplayName = "追击目标"),
-	EPCS_PreInteract UMETA(DisplayName = "交互前摇"),
-	EPCS_Interact UMETA(DisplayName = "交互"),
-	EPCS_PostInteract UMETA(DisplayName = "交互后摇"),
-};
-
 //单条玩家角色状态数据（参与Replicate）
 USTRUCT()
 struct FCharacterStateEntry : public FFastArraySerializerItem

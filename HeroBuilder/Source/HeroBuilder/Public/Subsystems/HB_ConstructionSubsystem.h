@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "HB_WorldSubsystem_Base.h"
 #include "../Config/ConstructionData.h"
+#include "Manager/HB_ConstructionManager.h"
 #include "Engine/StaticMeshActor.h"
 #include "HB_ConstructionSubsystem.generated.h"
 
@@ -13,7 +14,6 @@ DECLARE_LOG_CATEGORY_EXTERN(LogConstructionSubsystem,Log,All)
 class AHB_Building_Base;
 class AHB_ConstructionManager;
 class APreBuilding;
-
 /**
  * 
  */
@@ -27,6 +27,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UConstructionData> ConstructionData;
 	void TickPreviewBuildingPos();
+	UFUNCTION()
+	void OnCharacterEnterState(ACharacter* InCharacter, EPlayerCharacterState InState);
+	UFUNCTION()
+	void OnCharacterLeaveState(ACharacter* InCharacter, EPlayerCharacterState InState);
 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -35,6 +39,7 @@ public:
 	virtual TStatId GetStatId() const override { return TStatId(); }
     void SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
 	void ConstructionBegin(ACharacter* InCharacter);
+	void SetEnablePreviewBuildingPos(ACharacter* InCharacter, bool bEnable);
 	bool CheckCanConstruction(ACharacter* InCharacter);
 	void ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
 	void CancelConstructionMode(TObjectPtr<ACharacter>InCharacter);

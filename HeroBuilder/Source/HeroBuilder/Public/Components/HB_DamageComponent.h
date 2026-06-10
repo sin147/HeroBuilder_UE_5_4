@@ -13,7 +13,31 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnHealthChangedDelegate, float, O
 
 // 死亡委托：伤害来源
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDamageDeathDelegate, AActor*, Attacker);
+USTRUCT()
+struct FHealthChangeInfo
+{
+	GENERATED_BODY()
 
+	// 伤害来源
+	UPROPERTY()
+	TObjectPtr<AActor> Attacker = nullptr;
+
+	// 伤害值
+	UPROPERTY()
+	float Damage = 0.f;
+	//新生命值
+	UPROPERTY()
+	float NewHealth = 0.f;
+	//最大生命值
+	UPROPERTY()
+	float MaxHealth = 0.f;
+	//老生命值
+	UPROPERTY()
+	float OldHealth = 0.f;
+	//是否死亡
+	UPROPERTY()
+	bool bIsDead = false;
+};
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class HEROBUILDER_API UHB_DamageComponent : public UActorComponent
@@ -48,11 +72,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Damage")
 	bool IsDead() const { return bIsDead; }
 
-	// 血量变化时通知所有者（包括客户端OnRep）
+	// 血量变化时通知所有者（服务端在写入CurrentHealth后手动派发；客户端通过 OnRep_CurrentHealth 派发）
 	UPROPERTY(BlueprintAssignable, Category = "Damage")
 	FOnHealthChangedDelegate OnHealthChanged;
 
-	// 死亡时通知所有者（仅服务端触发）
+	// 死亡时通知所有者（服务端在置 bIsDead 后手动派发；客户端通过 OnRep_Death 派发）
 	UPROPERTY(BlueprintAssignable, Category = "Damage")
 	FOnDamageDeathDelegate OnDeath;
 
@@ -61,19 +85,19 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Damage")
+	UPROPERTY(Replicated,EditAnywhere, BlueprintReadOnly, Category = "Damage")
 	float MaxHealth = 100.f;
 
-	UPROPERTY(ReplicatedUsing = OnRep_CurrentHealth, BlueprintReadOnly, Category = "Damage")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Damage")
 	float CurrentHealth = 100.f;
 
-	UFUNCTION()
-	void OnRep_CurrentHealth(float OldHealth);
-
 private:
+	UPROPERTY(Replicated)
 	bool bIsDead = false;
-
-	// 客户端记录上一次最近的Attacker（仅做日志/UI参考），由服务端ApplyDamage时使用
-	UPROPERTY()
-	TObjectPtr<AActor> LastAttacker = nullptr;
+	// 客户端记录上一次最近的Attacker（用于OnRep时把Attacker一并通知给上层），由服务端ApplyDamage时写入并复制到客户端
+	UPROPERTY(ReplicatedUsing = OnRep_HealthChange)
+	FHealthChangeInfo HealthChangeInfo;
+	UFUNCTION()
+	void OnRep_HealthChange();
 };
+

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "HB_WorldSubsystem_Base.h"
+#include "Types/HB_Enums.h"
 #include "HB_DamageSubsystem.generated.h"
 DECLARE_LOG_CATEGORY_EXTERN(LogDamageSubsystem, Log, All);
 
@@ -26,15 +27,6 @@ struct FDamageInfo
 	FDamageInfo() = default;
 	FDamageInfo(AActor* InAttacker, float InDamage, AActor* InTarget)
 		: Attacker(InAttacker), Damage(InDamage), Target(InTarget) {}
-};
-
-UENUM(BlueprintType)
-enum ETargetType : int8
-{
-	Player UMETA(DisplayName = "玩家"),
-    Enemy UMETA(DisplayName = "敌人"),
-    Resource UMETA(DisplayName = "环境"),
-	Building UMETA(DisplayName = "建筑"),
 };
 
 /**

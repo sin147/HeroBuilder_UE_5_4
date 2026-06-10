@@ -7,6 +7,7 @@
 #include "AIController.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/WidgetComponent.h"
+#include "Types/HB_Enums.h"
 #include "HB_Enemy_Base.generated.h"
 
 class UHB_DamageComponent;
@@ -20,17 +21,6 @@ DECLARE_LOG_CATEGORY_EXTERN(LogEnemy, Log, All);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnEnemyHealthChangedDelegate, float, OldHealth, float, NewHealth, float, MaxHealth, AActor*, Attacker);
 
 class UBoxComponent;
-
-UENUM(BlueprintType)
-enum EEnemyState : uint8
-{
-	ES_Idle UMETA(DisplayName = "Idle"),
-	ES_Move UMETA(DisplayName = "Move"),
-	ES_PreAttack UMETA(DisplayName = "PreAttack"),
-	ES_Attack UMETA(DisplayName = "Attack"),
-	ES_PostAttack UMETA(DisplayName = "PostAttack"),
-	ES_Death UMETA(DisplayName = "Death")
-};
 
 
 UCLASS(Abstract)

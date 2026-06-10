@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
+#include "Types/HB_Enums.h"
 #include "HB_Base_Manager.generated.h"
 
 UCLASS(Abstract)

@@ -6,19 +6,11 @@
 #include "HB_WorldSubsystem_Base.h"
 #include "Config/WaveData.h"
 #include "SpawnPoint/HB_SpawnPoint_Enemy.h"
+#include "Types/HB_Enums.h"
 #include "HB_WaveSubsystem.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogWaveSubsystem, Log, All);
 class AHB_Enemy_Base;
-
-UENUM(BlueprintType)
-enum EWaveState:int8
-{
-	WS_Preparatory UMETA(DisplayName = "准备阶段"),
-	WS_Fight UMETA(DisplayName = "战斗阶段"),
-	WS_Stop UMETA(DisplayName = "停止阶段"),
-	WS_End UMETA(DisplayName = "结束阶段"),
-};
 
 
 /**

@@ -7,6 +7,7 @@
 #include "Config/ResourceData.h"
 #include "Config/InteractData.h"
 #include "Components/WidgetComponent.h"
+#include "Types/HB_Enums.h"
 #include "HB_Resource_Base.generated.h"
 
 class UHB_DamageComponent;
@@ -20,15 +21,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnResourceHealthChangedDelegate, 
 
 class UBoxComponent;
 
-UENUM(BlueprintType)
-enum EResourceState : uint8
-{
-	RS_Idle UMETA(DisplayName = "Idle"),
-	RS_BeHit UMETA(DisplayName = "BeHit"),
-	RS_Recover UMETA(DisplayName = "Recover"),
-	RS_Death UMETA(DisplayName = "Death"),
-};
-
 UCLASS(Abstract)
 class HEROBUILDER_API AHB_Resource_Base : public AActor
 {
@@ -40,38 +32,45 @@ public:
 	void OnHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker);
 
 private:
-	UPROPERTY(EditAnywhere, Category = "Attribute")
-	float MaxHealth = 100.f;
 
 	//受击后多少秒进入恢复状态（脱战恢复延迟）
-	UPROPERTY(EditAnywhere, Category = "Attribute")
+	UPROPERTY(EditAnywhere, Replicated, Category = "Attribute")
 	float RecoverDelay = 5.f;
 	float CurrentRecoverDelay = 0.f;
 
 	//每秒恢复的生命值
-	UPROPERTY(EditAnywhere, Category = "Attribute")
+	UPROPERTY(EditAnywhere, Replicated, Category = "Attribute")
 	float RecoverSpeed = 10.f;
 
 	//受击硬直时间
-	UPROPERTY(EditAnywhere, Category = "Attribute")
+	UPROPERTY(EditAnywhere, Replicated, Category = "Attribute")
 	float BeHitDuration = 0.3f;
 	float CurrentBeHitDuration = 0.f;
 
 	//死亡保留时间
-	UPROPERTY(EditAnywhere, Category = "Attribute")
+	UPROPERTY(EditAnywhere, Replicated, Category = "Attribute")
 	float DeathTime = 5.f;
 
 	//资源类型
-	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
+	UPROPERTY(EditAnywhere, Replicated, Category = "Attribute|Resource")
 	TEnumAsByte<EResourceType> ResourceType = EResourceType::RT_None;
 
 	//死亡时掉落的资源数量
-	UPROPERTY(EditAnywhere, Category = "Attribute|Resource")
+	UPROPERTY(EditAnywhere, Replicated, Category = "Attribute|Resource")
 	int32 ResourceAmount = 10;
+private:
+	UFUNCTION()
+	void OnRep_CurrentlyState();
+
+	// 记录上一次状态：服务端在 SwitchState 时先写入此字段，再写入 CurrentState；
+	// 由于 RepLayout 按属性声明顺序打包，客户端 OnRep_CurrentlyState 触发时 LastState 已经收到。
+	UPROPERTY(Replicated)
+	TEnumAsByte<EResourceState> LastState = EResourceState::RS_Idle;
 
 protected:
-	UPROPERTY(Replicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	TEnumAsByte<EResourceState> CurrentState;
+
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentlyState, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	TEnumAsByte<EResourceState> CurrentState= EResourceState::RS_Idle;
 	bool SwitchState(EResourceState NewState);
 	FString GetStateName(EResourceState State);
 
