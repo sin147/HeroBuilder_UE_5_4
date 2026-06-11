@@ -11,6 +11,8 @@ class AHB_Resource_Base;
 DECLARE_LOG_CATEGORY_EXTERN(LogResourceSubsystem, Log, All);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnSpawnResource, AHB_Resource_Base* /*Resource*/, FTransform /*Transform*/);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnDestroyResource, AHB_Resource_Base* /*Resource*/, FTransform /*Transform*/);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnResourceChange, EResourceType, ResourceType, int32, DeltaAmount, int32, TotalAmount);
+
 /**
  * 
  */
@@ -59,6 +61,7 @@ public:
 	TArray<TObjectPtr<AHB_Resource_Base>> GetAllResources();
 	//获取所有有效（未死亡）资源
 	TArray<TObjectPtr<AHB_Resource_Base>> GetAllAliveResources();
+	void AddResourceAmount(EResourceType InType, int32 InAmount);
 	//获取资源总数量
 	int32 GetResourceNum();
 	//是否有效
@@ -71,6 +74,8 @@ public:
 	bool ConsumeResourceAmount(EResourceType InType, int32 InAmount);
 	FOnSpawnResource OnSpawnResource;
 	FOnDestroyResource OnDestroyResource;
+	UPROPERTY(BlueprintAssignable)
+	FOnResourceChange OnResourceChange;
 
 public:
 	virtual void Tick(float DeltaTime) override;

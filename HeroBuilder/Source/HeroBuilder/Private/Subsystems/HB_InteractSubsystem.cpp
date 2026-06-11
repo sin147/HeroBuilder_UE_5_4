@@ -441,7 +441,7 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 	const EInteractType InteractType = GetInteractType(InCharacter);
 
 	// 统一的“对当前交互目标造成伤害”辅助函数
-	auto ApplyInteractDamage = [this, InCharacter]()
+	auto ApplyInteractDamage = [this, InCharacter](float AttackAmount)
 	{
 		AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
 		if (!HBCharacter)
@@ -454,7 +454,7 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 			return;
 		}
 		// 伤害值来自角色自身的攻击力（Attack）属性
-		const float Damage = HBCharacter->GetAttack();
+		const float Damage = AttackAmount;
 		if (Damage <= 0.f)
 		{
 			return;
@@ -465,6 +465,8 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 		}
 	};
 	const EInteractMode Mode = GetInteractMode(InCharacter);
+	//面向"待修建建筑"：玩家普通模式下交互即为修建/治疗，治疗量复用 Attack 属性
+	AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
 	switch (Mode)
 	{
 	case IM_Normal:
@@ -477,8 +479,6 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 			break;
 		case IT_Construction:
 		{
-			//面向"待修建建筑"：玩家普通模式下交互即为修建/治疗，治疗量复用 Attack 属性
-			AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter);
 			if (!HBCharacter)
 			{
 				break;
@@ -496,7 +496,7 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 		case IT_Mine:
 		case IT_Attack:
 			// 砍伐/采集/挖掘/攻击：统一对当前交互目标造成伤害
-			ApplyInteractDamage();
+			ApplyInteractDamage(HBCharacter ? HBCharacter->GetAttack() : 0.f);
 			break;
 		default:
 			break;

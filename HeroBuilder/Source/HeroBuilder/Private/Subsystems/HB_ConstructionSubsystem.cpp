@@ -148,7 +148,7 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 		UE_LOG(LogConstructionSubsystem, Warning, TEXT("ActiveConstructionMode: ConstructionManager not ready"));
 		return;
 	}
-
+	TSubclassOf<AHB_Building_Base> DefaultBuildingClass = ConstructionData->GetDefaultBuildingClass();
 	//已存在预览体：复用+重新显示，不再 Spawn
 	if (Mgr->HasEntry(InCharacter))
 	{
@@ -157,15 +157,21 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 			//重复进入，忽略
 			return;
 		}
-		if (APreBuilding* ExistActor = Mgr->GetPreBuildingMeshActor(InCharacter))
+		if (!IsValid(Mgr->GetPreBuildingMeshActor(InCharacter)))
 		{
-			ExistActor->SetActorHiddenInGame(false);
+			APreBuilding* NewPreStaticMeshActor = GetWorld()->SpawnActor<APreBuilding>();
+			if (!NewPreStaticMeshActor)
+			{
+				UE_LOG(LogConstructionSubsystem, Warning, TEXT("Failed to spawn PreStaticMeshActor"));
+				return;
+			}
+
+			UStaticMesh* PreBuildingMesh = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetBuildingPreviewMesh(DefaultBuildingClass);
+			NewPreStaticMeshActor->SetStaticMesh(PreBuildingMesh);
 		}
 		Mgr->SetIsActive(InCharacter, true);
 		return;
 	}
-
-	TSubclassOf<AHB_Building_Base> DefaultBuildingClass = ConstructionData->GetDefaultBuildingClass();
 
 	// 首次进入：生成预览模型
 	APreBuilding* NewPreStaticMeshActor = GetWorld()->SpawnActor<APreBuilding>();
@@ -174,11 +180,9 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 		UE_LOG(LogConstructionSubsystem, Warning, TEXT("Failed to spawn PreStaticMeshActor"));
 		return;
 	}
-	NewPreStaticMeshActor->SetMobility(EComponentMobility::Movable);
 
 	UStaticMesh* PreBuildingMesh = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetBuildingPreviewMesh(DefaultBuildingClass);
 	NewPreStaticMeshActor->SetStaticMesh(PreBuildingMesh);
-	NewPreStaticMeshActor->SetActorHiddenInGame(false);
 
 	//通过 Manager 写入：会自动触发 FastArray 差量复制到所有客户端
 	Mgr->SetPreBuildingMeshActor(InCharacter, NewPreStaticMeshActor);

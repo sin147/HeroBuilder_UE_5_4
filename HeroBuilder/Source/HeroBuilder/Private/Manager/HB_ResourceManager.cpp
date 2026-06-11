@@ -2,9 +2,65 @@
 
 #include "Manager/HB_ResourceManager.h"
 #include "Net/UnrealNetwork.h"
+#include "Subsystems/HB_ResourceSubsystem.h"
+#include "Engine/World.h"
+
+void FResourceAmountEntry::PostReplicatedChange(const FFastArraySerializer& ArraySerializer)
+{
+	//反查容器 → Manager → World → Subsystem
+	const FResourceWarehouse& Container = static_cast<const FResourceWarehouse&>(ArraySerializer);
+	AHB_ResourceManager* Mgr = Container.OwnerManager.Get();
+	if (!IsValid(Mgr))
+	{
+		return;
+	}
+	UWorld* World = Mgr->GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	UHB_ResourceSubsystem* Sys = World->GetSubsystem<UHB_ResourceSubsystem>();
+	if (!Sys)
+	{
+		return;
+	}
+	//客户端 FastArray 回调路径：直接 Broadcast 公开委托，与服务端权威路径产生一致的 Leave/Enter/Changed 通知
+	Sys->OnResourceChange.Broadcast(ResourceType, Amount - LastAmount, Amount);
+}
+
+void FResourceAmountEntry::PostReplicatedAdd(const FFastArraySerializer& ArraySerializer)
+{
+	//反查容器 → Manager → World → Subsystem
+	const FResourceWarehouse& Container = static_cast<const FResourceWarehouse&>(ArraySerializer);
+	AHB_ResourceManager* Mgr = Container.OwnerManager.Get();
+	if (!IsValid(Mgr))
+	{
+		return;
+	}
+	UWorld* World = Mgr->GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	UHB_ResourceSubsystem* Sys = World->GetSubsystem<UHB_ResourceSubsystem>();
+	if (!Sys)
+	{
+		return;
+	}
+	//客户端 FastArray 回调路径：直接 Broadcast 公开委托，与服务端权威路径产生一致的 Leave/Enter/Changed 通知
+	Sys->OnResourceChange.Broadcast(ResourceType, Amount - LastAmount, Amount);
+}
+
 
 AHB_ResourceManager::AHB_ResourceManager()
 {
+}
+
+void AHB_ResourceManager::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	//为容器填入反向指针，供 FastArrayItem 回调反查 Manager→World→Subsystem 进行事件派发
+	ResourceWarehouse.OwnerManager = this;
 }
 
 TArray<TObjectPtr<AHB_Resource_Base>> AHB_ResourceManager::GetAllResources() const
@@ -25,9 +81,9 @@ void AHB_ResourceManager::RemoveResource(AHB_Resource_Base* Resource)
 	}
 }
 
-void AHB_ResourceManager::AddResourceAmount(EResourceType InType, int32 InAmount)
+void AHB_ResourceManager::SetResourceAmount(EResourceType InType, int32 InAmount)
 {
-	if (InType == EResourceType::RT_None || InAmount <= 0)
+	if (InType == EResourceType::RT_None)
 	{
 		return;
 	}
@@ -36,8 +92,8 @@ void AHB_ResourceManager::AddResourceAmount(EResourceType InType, int32 InAmount
 	{
 		if (Entry.ResourceType == InType)
 		{
-			Entry.Amount += InAmount;
-			//FastArray：修改条目后必须标脏，否则不会触发差量复制
+			Entry.LastAmount = Entry.Amount;
+			Entry.Amount = InAmount;
 			ResourceWarehouse.MarkItemDirty(Entry);
 			return;
 		}
@@ -45,6 +101,7 @@ void AHB_ResourceManager::AddResourceAmount(EResourceType InType, int32 InAmount
 
 	FResourceAmountEntry NewEntry;
 	NewEntry.ResourceType = InType;
+    NewEntry.LastAmount = 0;
 	NewEntry.Amount = InAmount;
 	const int32 Idx = ResourceWarehouse.ResourceAmountList.Add(NewEntry);
 	//FastArray：新增条目同样需要标脏

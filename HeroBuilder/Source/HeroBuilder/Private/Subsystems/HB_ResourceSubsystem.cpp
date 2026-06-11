@@ -288,8 +288,9 @@ void UHB_ResourceSubsystem::OnResourceDeath(AHB_Resource_Base* InResource)
 
 	if (AHB_ResourceManager* Manager = GetManager<AHB_ResourceManager>())
 	{
-		Manager->AddResourceAmount(Type, Amount);
+		AddResourceAmount(Type, Amount);
 	}
+
 }
 
 TArray<TObjectPtr<AHB_Resource_Base>> UHB_ResourceSubsystem::GetAllResources()
@@ -309,6 +310,19 @@ TArray<TObjectPtr<AHB_Resource_Base>> UHB_ResourceSubsystem::GetAllAliveResource
 		}
 	}
 	return AliveResources;
+}
+
+void UHB_ResourceSubsystem::AddResourceAmount(EResourceType InType, int32 InAmount)
+{
+	//获取资源管理器
+	if (AHB_ResourceManager* Manager = GetManager<AHB_ResourceManager>())
+	{
+		//获取当前数量
+		int32 CurrentAmount = Manager->GetResourceAmount(InType);
+		//增加数量
+		Manager->SetResourceAmount(InType, CurrentAmount + InAmount);
+        OnResourceChange.Broadcast(InType, InAmount, CurrentAmount + InAmount);
+	}
 }
 
 int32 UHB_ResourceSubsystem::GetResourceNum()

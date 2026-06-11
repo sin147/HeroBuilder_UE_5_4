@@ -118,6 +118,10 @@ void UHB_DamageComponent::Heal(float HealAmount)
 		// 服务端等价OnRep派发
 		OnHealthChanged.Broadcast(OldHealth, CurrentHealth, MaxHealth, nullptr);
 	}
+	HealthChangeInfo.MaxHealth = MaxHealth;
+	HealthChangeInfo.OldHealth = OldHealth;
+    HealthChangeInfo.NewHealth = CurrentHealth;
+    HealthChangeInfo.bIsDead = bIsDead;
 }
 
 void UHB_DamageComponent::Revive(float NewHealth)
@@ -141,6 +145,10 @@ void UHB_DamageComponent::Revive(float NewHealth)
 		// 服务端等价OnRep派发
 		OnHealthChanged.Broadcast(OldHealth, CurrentHealth, MaxHealth, nullptr);
 	}
+	HealthChangeInfo.MaxHealth = MaxHealth;
+	HealthChangeInfo.OldHealth = OldHealth;
+	HealthChangeInfo.NewHealth = CurrentHealth;
+	HealthChangeInfo.bIsDead = bIsDead;
 }
 
 void UHB_DamageComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

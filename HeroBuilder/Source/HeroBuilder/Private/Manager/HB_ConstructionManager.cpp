@@ -191,6 +191,7 @@ void AHB_ConstructionManager::SetIsActive(ACharacter* InCharacter, bool bInActiv
 		return;
 	}
 	Entry.bIsActive = bInActive;
+	Entry.PreBuildingMeshActor->SetActorHiddenInGame(!bInActive);
 	PreBuildingContainer.MarkItemDirty(Entry);
 }
 
