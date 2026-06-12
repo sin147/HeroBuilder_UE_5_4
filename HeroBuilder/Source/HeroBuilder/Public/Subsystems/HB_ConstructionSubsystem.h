@@ -14,6 +14,12 @@ DECLARE_LOG_CATEGORY_EXTERN(LogConstructionSubsystem,Log,All)
 class AHB_Building_Base;
 class AHB_ConstructionManager;
 class APreBuilding;
+
+//—— 公开委托（蓝图可绑定）：客户端 FastArray 回调与服务端权威路径都收敛到这里 ——
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnPreBuildingClassChanged, ACharacter*, Character, TSubclassOf<AHB_Building_Base>, NewClass, TSubclassOf<AHB_Building_Base>, OldClass);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnPreBuildingActorChanged, ACharacter*, Character, APreBuilding*, NewActor, APreBuilding*, OldActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPreBuildingActiveChanged, ACharacter*, Character, bool, bIsActive);
+
 /**
  * 
  */
@@ -38,7 +44,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { return TStatId(); }
     void SwitchBuilding(ACharacter* InOwnerCharacter, TSubclassOf<AHB_Building_Base> InBuildingClass);
-	void ConstructionBegin(ACharacter* InCharacter);
+	void PutBuilding(ACharacter* InCharacter);
 	void SetEnablePreviewBuildingPos(ACharacter* InCharacter, bool bEnable);
 	bool CheckCanConstruction(ACharacter* InCharacter);
 	void ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
@@ -46,4 +52,12 @@ public:
 
 	//获取单例 ConstructionManager：统一走基类 GetManager<T>()，服务端读 GameMode、客户端读已复制的 GameState
 	AHB_ConstructionManager* GetConstructionManager();
+
+	//—— 公开委托：所有派发口收敛到 Manager.BroadcastXxx → 这里 Broadcast ——
+	UPROPERTY(BlueprintAssignable)
+	FOnPreBuildingClassChanged OnPreBuildingClassChanged;
+	UPROPERTY(BlueprintAssignable)
+	FOnPreBuildingActorChanged OnPreBuildingActorChanged;
+	UPROPERTY(BlueprintAssignable)
+	FOnPreBuildingActiveChanged OnPreBuildingActiveChanged;
 };

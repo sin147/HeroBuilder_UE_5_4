@@ -109,6 +109,10 @@ public:
 	const TArray<FCharacterStateEntry>& GetAllEntries() const { return CharacterStateContainer.CharacterStateEntries; }
 	TArray<TObjectPtr<ACharacter>> GetAllCharacters() const;
 
+	//统一对外派发角色状态变化（服务端权威路径与客户端 FastArray 路径都收敛到这里）
+	//仅做 Broadcast，不修改表（避免在客户端 Item 回调中触发副作用写入）
+	void BroadcastCharacterStateChanged(ACharacter* InCharacter, EPlayerCharacterState OldState, EPlayerCharacterState NewState);
+
 private:
 	//全玩家角色状态表（整张数组复制给所有客户端；UPROPERTY不支持复制TMap，故用TArray）
 	UPROPERTY(Replicated)

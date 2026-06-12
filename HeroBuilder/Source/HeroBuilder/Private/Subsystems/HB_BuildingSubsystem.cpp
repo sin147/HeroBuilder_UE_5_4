@@ -7,6 +7,7 @@
 #include "Manager/HB_BuildingManager.h"
 #include "Subsystems/HB_EnemySubsystem.h"
 #include "Subsystems/HB_GridSubsystem.h"
+#include "Subsystems/HB_ResourceSubsystem.h"
 
 DEFINE_LOG_CATEGORY(LogBuildingSystem);
 
@@ -100,6 +101,56 @@ void UHB_BuildingSubsystem::Tick(float DeltaTime)
 	TickFindTarget();
 }
 
+bool UHB_BuildingSubsystem::CanSpawnBuilding(TSubclassOf<AHB_Building_Base> InClass) const
+{
+	//空类直接拒绝：上层拿不到合法类时也不应该让 UI 点亮"可建造"
+	if (!InClass)
+	{
+		return false;
+	}
+
+	//BuildingData 未就绪：默认放行（与原 "未配置=免费" 语义一致，避免初始化顺序问题倒致全局不能建造）
+	if (!IsValid(BuildingData))
+	{
+		return true;
+	}
+
+	//该建筑未配资源消耗：免费建筑，直接放行
+	const FBuildingConfig BuildingCfg = const_cast<UBuildingData*>(BuildingData.Get())->GetBuildingInfoByBuildingClass(InClass);
+	if (BuildingCfg.BuildCostMap.Num() == 0)
+	{
+		return true;
+	}
+
+	//需依赖 ResourceSubsystem 查询玩家现有资源；Subsystem 未就绪路径安全起见返回 false
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+	UHB_ResourceSubsystem* ResourceSub = World->GetSubsystem<UHB_ResourceSubsystem>();
+	if (!ResourceSub)
+	{
+		return false;
+	}
+
+	//逐项校验：任一资源不足即返回 false； RT_None / 非正数视为无效项跳过
+	for (const TPair<TEnumAsByte<EResourceType>, int32>& CostPair : BuildingCfg.BuildCostMap)
+	{
+		const EResourceType CostType = CostPair.Key.GetValue();
+		const int32 CostAmount = CostPair.Value;
+		if (CostType == EResourceType::RT_None || CostAmount <= 0)
+		{
+			continue;
+		}
+		if (ResourceSub->GetResourceAmount(CostType) < CostAmount)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 void UHB_BuildingSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass, const FTransform& InTransform)
 {
 	//仅服务端生成建筑
@@ -114,8 +165,40 @@ void UHB_BuildingSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass
 		return;
 	}
 
+	//建造前置校验：资源不足直接拒绝（与 UI/PreBuilding 复用同一套 CanSpawnBuilding 逻辑，结论一致）
+	if (!CanSpawnBuilding(InClass))
+	{
+		UE_LOG(LogBuildingSystem, Warning, TEXT("SpawnBuilding aborted by CanSpawnBuilding: %s"), *InClass->GetName());
+		return;
+	}
+
 	UE_LOG(LogBuildingSystem, Log, TEXT("Spawning building - Class: %s, Location: %s"),
 		*InClass->GetName(), *InTransform.GetLocation().ToString());
+
+	//校验通过后执行实际扣除（必须在真正生成 Actor 之前完成，避免失败时残留脏数据）
+	//说明：
+	//- BuildingData 未就绪 / BuildCostMap 为空 → CanSpawnBuilding 已放行，这里同样会自然跳过
+	//- 通过 ResourceSubsystem 统一对接，避免 BuildingSubsystem 直接耦合 ResourceManager
+	if (IsValid(BuildingData))
+	{
+		const FBuildingConfig BuildingCfg = BuildingData->GetBuildingInfoByBuildingClass(InClass);
+		if (BuildingCfg.BuildCostMap.Num() > 0)
+		{
+			if (UHB_ResourceSubsystem* ResourceSub = GetWorld() ? GetWorld()->GetSubsystem<UHB_ResourceSubsystem>() : nullptr)
+			{
+				for (const TPair<TEnumAsByte<EResourceType>, int32>& CostPair : BuildingCfg.BuildCostMap)
+				{
+					const EResourceType CostType = CostPair.Key.GetValue();
+					const int32 CostAmount = CostPair.Value;
+					if (CostType == EResourceType::RT_None || CostAmount <= 0)
+					{
+						continue;
+					}
+					ResourceSub->ConsumeResourceAmount(CostType, CostAmount);
+				}
+			}
+		}
+	}
 
 	//生成建筑
 	TObjectPtr<AHB_Building_Base> DeferredBuilding = GetWorld()->SpawnActorDeferred<AHB_Building_Base>(InClass, InTransform);

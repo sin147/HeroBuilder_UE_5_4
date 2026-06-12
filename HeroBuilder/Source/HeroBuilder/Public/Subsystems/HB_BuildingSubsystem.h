@@ -37,6 +37,13 @@ private:
 	int32 DestroyNumByTick = 20;
 public:
 	/*************************************外部接口*****************************************/
+	//是否满足生成该建筑的前置条件（目前=资源是否充足）
+	//说明：
+	//- const 只读，不修改任何状态，可被 UI / PreBuilding / SpawnBuilding 三处共用
+	//- 仅做"校验"，不做"扣除"；扣除仍由 SpawnBuilding 在确认建造瞬间统一执行
+	//- BuildingData 未就绪 / BuildCostMap 为空，视为"免费建筑"，直接返回 true
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Building")
+	bool CanSpawnBuilding(TSubclassOf<AHB_Building_Base> InClass) const;
 	//生成建筑
 	void SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass, const FTransform& InTransform);
 	//以Grid坐标(X,Y)生成建筑：内部根据GridSubsystem格宽，把(X,Y)还原为格子中心的世界坐标后调用SpawnBuilding

@@ -61,7 +61,7 @@ public:
 	// 复活：将 bIsDead 重置为 false 并把当前血量设为 NewHealth（不超过 MaxHealth）。仅在 Authority 生效。
 	// 用于"死亡-治疗-复活"场景：让此前因 ApplyDamage 击杀而锁死的 Heal/ApplyDamage 重新生效。
 	UFUNCTION(BlueprintCallable, Category = "Damage")
-	void Revive(float NewHealth);
+	void Revive(float NewHealth = -1.f);
 
 	UFUNCTION(BlueprintCallable, Category = "Damage")
 	float GetCurrentHealth() const { return CurrentHealth; }

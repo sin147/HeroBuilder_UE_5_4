@@ -5,6 +5,7 @@
 #include "Subsystems/HB_BuildingSubsystem.h"
 #include "Subsystems/HB_GridSubsystem.h"
 #include "Subsystems/HB_CharacterSubsystem.h"
+#include "Subsystems/HB_InteractSubsystem.h"
 #include "Camera/CameraComponent.h"
 #include "../HeroBuilderCharacter.h"
 #include "Building/HB_Building_Base.h"
@@ -35,8 +36,6 @@ void UHB_ConstructionSubsystem::PostInitialize()
 	GridWidth = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridWidth();
 	GridHeight = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridHeight();
 	NetMode = GetWorld()->GetNetMode();
-    GetWorld()->GetSubsystem<UHB_CharacterSubsystem>()->OnCharacterEnterState.AddDynamic(this, &UHB_ConstructionSubsystem::OnCharacterEnterState);
-	GetWorld()->GetSubsystem<UHB_CharacterSubsystem>()->OnCharacterLeaveState.AddDynamic(this, &UHB_ConstructionSubsystem::OnCharacterLeaveState);
 }
 
 void UHB_ConstructionSubsystem::Tick(float DeltaTime)
@@ -79,7 +78,7 @@ void UHB_ConstructionSubsystem::SwitchBuilding(ACharacter* InOwnerCharacter, TSu
 	Mgr->SetBuildingClass(InOwnerCharacter, InBuildingClass);
 }
 
-void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
+void UHB_ConstructionSubsystem::PutBuilding(ACharacter* InCharacter)
 {
 	//公共前置：可建造性 + 必要依赖 + Grid 索引（客户端/服务端均需要）
 	if (!CheckCanConstruction(InCharacter))
@@ -118,7 +117,7 @@ void UHB_ConstructionSubsystem::ConstructionBegin(ACharacter* InCharacter)
 		}
 		GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->SpawnBuildingAtGrid(
 			BuildingClass, GX, GY, PreActor->GetActorRotation(), PreActor->GetActorScale());
-		UE_LOG(LogConstructionSubsystem, Log, TEXT("ConstructionBegin: spawn building"));
+		UE_LOG(LogConstructionSubsystem, Log, TEXT("PutBuilding: spawn building"));
 	}
 
 }
@@ -157,19 +156,32 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 			//重复进入，忽略
 			return;
 		}
-		if (!IsValid(Mgr->GetPreBuildingMeshActor(InCharacter)))
-		{
-			APreBuilding* NewPreStaticMeshActor = GetWorld()->SpawnActor<APreBuilding>();
-			if (!NewPreStaticMeshActor)
-			{
-				UE_LOG(LogConstructionSubsystem, Warning, TEXT("Failed to spawn PreStaticMeshActor"));
-				return;
-			}
-
-			UStaticMesh* PreBuildingMesh = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetBuildingPreviewMesh(DefaultBuildingClass);
-			NewPreStaticMeshActor->SetStaticMesh(PreBuildingMesh);
-		}
+	// if (!IsValid(Mgr->GetPreBuildingMeshActor(InCharacter)))
+	// {
+	// 	APreBuilding* NewPreStaticMeshActor = GetWorld()->SpawnActor<APreBuilding>();
+	// 	if (!NewPreStaticMeshActor)
+	// 	{
+	// 		UE_LOG(LogConstructionSubsystem, Warning, TEXT("Failed to spawn PreStaticMeshActor"));
+	// 		return;
+	// 	}
+	// 	UStaticMesh* PreBuildingMesh = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetBuildingPreviewMesh(DefaultBuildingClass);
+	// 	Mgr->SetPreBuildingMeshActor(InCharacter, NewPreStaticMeshActor);
+	// 	NewPreStaticMeshActor->SetStaticMesh(PreBuildingMesh);
+	// }
+	// //每次激活时检测当前 BuildingClass 是否有效，无效则回退到默认值并刷新预览 Mesh
+	// if (!IsValid(Mgr->GetBuildingClass(InCharacter)))
+	// {
+	// 	Mgr->SetBuildingClass(InCharacter, DefaultBuildingClass);
+	// 	UE_LOG(LogConstructionSubsystem, Log, TEXT("ActiveConstructionMode: BuildingClass invalid, fallback to default"));
+	// }
 		Mgr->SetIsActive(InCharacter, true);
+		return;
+	}
+
+	// 首次进入：DefaultBuildingClass 必须有效，否则直接报错返回，避免向客户端复制一个 BuildingClass=nullptr 的 Entry
+	if (!IsValid(DefaultBuildingClass))
+	{
+		UE_LOG(LogConstructionSubsystem, Error, TEXT("ActiveConstructionMode: DefaultBuildingClass is null, please check DA_ConstructionConfig"));
 		return;
 	}
 
@@ -184,10 +196,9 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 	UStaticMesh* PreBuildingMesh = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetBuildingPreviewMesh(DefaultBuildingClass);
 	NewPreStaticMeshActor->SetStaticMesh(PreBuildingMesh);
 
-	//通过 Manager 写入：会自动触发 FastArray 差量复制到所有客户端
-	Mgr->SetPreBuildingMeshActor(InCharacter, NewPreStaticMeshActor);
-	Mgr->SetBuildingClass(InCharacter, DefaultBuildingClass);
-	Mgr->SetIsActive(InCharacter, true);
+	//通过 Manager 一次性写入 Entry：原子完成 BuildingClass / PreBuildingMeshActor / bIsActive 的赋值并只标脏一次
+	//避免多次 Setter 调用导致客户端先收到 BuildingClass=nullptr 的中间态
+	Mgr->AddEntry(InCharacter, DefaultBuildingClass, NewPreStaticMeshActor, /*bInActive=*/true);
 }
 
 void UHB_ConstructionSubsystem::CancelConstructionMode(TObjectPtr<ACharacter>InCharacter)
@@ -241,8 +252,9 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 		{
 			continue;
 		}
-		UCameraComponent* FollowCamera = GetWorld()->GetSubsystem<UHB_CharacterSubsystem>()->GetCharacterFollowCamera(PlayerCharacter);
-		if (!FollowCamera)
+		UHB_CharacterSubsystem* CharacterSubsystem = GetWorld()->GetSubsystem<UHB_CharacterSubsystem>();
+        UCameraComponent* FollowCamera = CharacterSubsystem->GetCharacterFollowCamera(PlayerCharacter);
+        if (!FollowCamera||CharacterSubsystem->IsInteracting(PlayerCharacter))
 		{
 			continue;
 		}

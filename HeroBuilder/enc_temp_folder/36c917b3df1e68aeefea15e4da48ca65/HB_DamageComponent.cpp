@@ -88,8 +88,6 @@ void UHB_DamageComponent::ApplyDamage(AActor* Attacker, float Damage)
 
 void UHB_DamageComponent::OnRep_HealthChange()
 {
-	UE_LOG(LogDamageComponent, Log, TEXT("Client %s health changed, health: %.1f -> %.1f"),
-		*GetOwner()->GetName(), HealthChangeInfo.OldHealth, HealthChangeInfo.NewHealth);
     if (HealthChangeInfo.bIsDead)
 	{
 		OnDeath.Broadcast(HealthChangeInfo.Attacker);

@@ -62,6 +62,8 @@ public:
 	FOnCharacterEnterState OnCharacterEnterState;
 	UPROPERTY(BlueprintAssignable)
 	FOnCharacterLeaveState OnCharacterLeaveState;
+	//是否处于交互三段（PreInteract / Interact / PostInteract）；内部通过 AHB_CharacterHelper 封装外发
+	UFUNCTION(BlueprintPure, Category = "Character")
 	bool IsInteracting(AHeroBuilderCharacter* InCharacter);
 
 private:

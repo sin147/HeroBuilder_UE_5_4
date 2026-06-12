@@ -319,9 +319,8 @@ void UHB_ResourceSubsystem::AddResourceAmount(EResourceType InType, int32 InAmou
 	{
 		//获取当前数量
 		int32 CurrentAmount = Manager->GetResourceAmount(InType);
-		//增加数量
+		//增加数量（Manager 内部已统一派发 OnResourceChange，这里不再重复广播）
 		Manager->SetResourceAmount(InType, CurrentAmount + InAmount);
-        OnResourceChange.Broadcast(InType, InAmount, CurrentAmount + InAmount);
 	}
 }
 

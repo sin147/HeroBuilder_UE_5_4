@@ -26,7 +26,9 @@ public:
 	int32 Amount = 0;
 	UPROPERTY()
 	int32 LastAmount = 0;
-    void PostReplicatedAdd(const FFastArraySerializer& ArraySerializer);
+
+	//FastArray 客户端回调：内部只反查 Manager，由 Manager 统一对外派发
+	void PostReplicatedAdd(const FFastArraySerializer& ArraySerializer);
 	void PostReplicatedChange(const FFastArraySerializer& ArraySerializer);
 };
 USTRUCT()
@@ -88,4 +90,7 @@ public:
 	AHB_ResourceManager();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PostInitializeComponents() override;
+
+	//统一对外派发资源变化（服务端权威路径与客户端 FastArray 路径都收敛到这里）
+	void BroadcastResourceChange(EResourceType InType, int32 InDelta, int32 InNewAmount);
 };

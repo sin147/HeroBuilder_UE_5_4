@@ -53,6 +53,8 @@ class AHeroBuilderCharacter : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* InteractAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* PutAction;
 
 	UFUNCTION(Server,Reliable)
 	void Server_Attack();
@@ -75,7 +77,14 @@ protected:
 	bool CanMove();
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
-			
+	
+	void Put(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Reliable)
+	void Server_Put();
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_Put();
+
 	void ChangeConstructionMode(const FInputActionValue& Value);
 	//请求服务端切换建造模式（在 IM_Normal 与 IM_Construction 之间切换）
 	UFUNCTION(Server, Reliable)

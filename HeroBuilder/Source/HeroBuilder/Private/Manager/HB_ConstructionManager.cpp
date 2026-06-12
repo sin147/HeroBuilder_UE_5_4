@@ -2,34 +2,66 @@
 
 
 #include "Manager/HB_ConstructionManager.h"
+#include "Subsystems/HB_ConstructionSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
 
 //—— FPreBuildingInfo 的 FastArray 回调（客户端在收到 增/删/改 时被调用） ——
-//说明：UHB_ConstructionSubsystem 当前未提供面向预览体数据变化的公开委托，
-//此处保留与原 TMap 直接读取一致的占位语义；后续如需对外通知，
-//可在此通过反向指针 Container.OwnerManager → World → Subsystem 进行派发。
-void FPreBuildingInfo::PreReplicatedRemove(const FFastArraySerializer& /*ArraySerializer*/)
+//说明：Item 回调内只反查 Manager，由 Manager 统一派发委托（与 ResourceManager 一致）
+void FPreBuildingInfo::PreReplicatedRemove(const FFastArraySerializer& ArraySerializer)
 {
-	//占位：本条记录被移除，可在此触发本地清理（如销毁本地预览Actor、隐藏UI）
+	const FPreBuildingContainer& Container = static_cast<const FPreBuildingContainer&>(ArraySerializer);
+	AHB_ConstructionManager* Mgr = Container.OwnerManager.Get();
+	if (!Mgr)
+	{
+		return;
+	}
+	//被移除时：如果还拿到有效预览 Actor / Class，视为 Old=当前值, New=空
+	if (PreBuildingMeshActor)
+	{
+		Mgr->BroadcastPreBuildingActorChanged(Character.Get(), PreBuildingMeshActor, nullptr);
+	}
+	if (BuildingClass)
+	{
+		Mgr->BroadcastPreBuildingClassChanged(Character.Get(), BuildingClass, nullptr);
+	}
 }
 
-void FPreBuildingInfo::PostReplicatedAdd(const FFastArraySerializer& /*ArraySerializer*/)
+void FPreBuildingInfo::PostReplicatedAdd(const FFastArraySerializer& ArraySerializer)
 {
-	//首次到达：把当前值作为本地基线缓存，避免后续Change被误判
+	//首次到达：把当前值作为本地基线缓存，避免后续 Change 被误判
 	PreviousBuildingClass        = BuildingClass;
 	PreviousPreBuildingMeshActor = PreBuildingMeshActor;
 	bPreviousIsActive            = bIsActive;
-	//占位：本条记录被新增，可在此初始化本地表现
+
+	const FPreBuildingContainer& Container = static_cast<const FPreBuildingContainer&>(ArraySerializer);
+	AHB_ConstructionManager* Mgr = Container.OwnerManager.Get();
+	if (!Mgr)
+	{
+		return;
+	}
+	//首次到达：以 Old=默认 / Old=nullptr 形式派发当前值
+	if (BuildingClass)
+	{
+		Mgr->BroadcastPreBuildingClassChanged(Character.Get(), nullptr, BuildingClass);
+	}
+	if (PreBuildingMeshActor)
+	{
+		Mgr->BroadcastPreBuildingActorChanged(Character.Get(), nullptr, PreBuildingMeshActor);
+	}
+	Mgr->BroadcastPreBuildingActiveChanged(Character.Get(), bIsActive);
 }
 
-void FPreBuildingInfo::PostReplicatedChange(const FFastArraySerializer& /*ArraySerializer*/)
+void FPreBuildingInfo::PostReplicatedChange(const FFastArraySerializer& ArraySerializer)
 {
-	//与 FInteractEntry 一致：Item 内任意字段变化都会回调到此，需自行做差量比较
+	//Item 内任意字段变化都会回调到此，需自行做差量比较
 	const bool bClassChanged    = (PreviousBuildingClass != BuildingClass);
 	const bool bMeshActorChanged= (PreviousPreBuildingMeshActor.Get() != PreBuildingMeshActor);
 	const bool bActiveChanged   = (bPreviousIsActive != bIsActive);
+
+	const TSubclassOf<AHB_Building_Base> OldClass    = PreviousBuildingClass;
+	APreBuilding* const                  OldActor    = PreviousPreBuildingMeshActor.Get();
 
 	//刷新本地基线
 	PreviousBuildingClass        = BuildingClass;
@@ -40,7 +72,25 @@ void FPreBuildingInfo::PostReplicatedChange(const FFastArraySerializer& /*ArrayS
 	{
 		return;
 	}
-	//占位：在此响应自己/他人建造预览数据变更（如刷新预览Mesh、显隐切换）
+
+	const FPreBuildingContainer& Container = static_cast<const FPreBuildingContainer&>(ArraySerializer);
+	AHB_ConstructionManager* Mgr = Container.OwnerManager.Get();
+	if (!Mgr)
+	{
+		return;
+	}
+	if (bClassChanged)
+	{
+		Mgr->BroadcastPreBuildingClassChanged(Character.Get(), OldClass, BuildingClass);
+	}
+	if (bMeshActorChanged)
+	{
+		Mgr->BroadcastPreBuildingActorChanged(Character.Get(), OldActor, PreBuildingMeshActor);
+	}
+	if (bActiveChanged)
+	{
+		Mgr->BroadcastPreBuildingActiveChanged(Character.Get(), bIsActive);
+	}
 }
 
 AHB_ConstructionManager::AHB_ConstructionManager()
@@ -119,6 +169,54 @@ bool AHB_ConstructionManager::HasEntry(ACharacter* InCharacter) const
 	return FindEntry(InCharacter) != nullptr;
 }
 
+bool AHB_ConstructionManager::AddEntry(ACharacter* InCharacter,
+	TSubclassOf<AHB_Building_Base> InBuildingClass,
+	APreBuilding* InPreBuildingMeshActor,
+	bool bInActive)
+{
+	if (!IsValid(InCharacter))
+	{
+		return false;
+	}
+	//已存在则不做修改：调用方应改用 SetXxx 走差量更新路径
+	if (FindEntry(InCharacter) != nullptr)
+	{
+		return false;
+	}
+
+	//一次性构造 Entry：在 Add 进数组之前把所有字段填齐，避免插入后多次标脏导致客户端拿到中间态
+	FPreBuildingInfo NewEntry;
+	NewEntry.Character            = InCharacter;
+	NewEntry.BuildingClass        = InBuildingClass;
+	NewEntry.PreBuildingMeshActor = InPreBuildingMeshActor;
+	NewEntry.bIsActive            = bInActive;
+
+	const int32 Idx = PreBuildingContainer.PreBuildingEntries.Add(NewEntry);
+	FPreBuildingInfo& AddedRef = PreBuildingContainer.PreBuildingEntries[Idx];
+	//FastArray 新增必须手动标脏，否则 OldMap 不会同步、下次序列化会告警或丢包
+	PreBuildingContainer.MarkItemDirty(AddedRef);
+
+	//与 PreBuildingMeshActor 可见性保持一致（与 SetIsActive 路径一致）
+	if (AddedRef.PreBuildingMeshActor)
+	{
+		AddedRef.PreBuildingMeshActor->SetActorHiddenInGame(!bInActive);
+	}
+
+	//服务端权威路径：FastArray 客户端回调只在客户端跑，这里显式派发，保证 Listen Server 也能收到事件
+	//发送语义与 PostReplicatedAdd 客户端首达时一致：Old=空, New=当前值
+	if (InBuildingClass)
+	{
+		BroadcastPreBuildingClassChanged(InCharacter, nullptr, InBuildingClass);
+	}
+	if (InPreBuildingMeshActor)
+	{
+		BroadcastPreBuildingActorChanged(InCharacter, nullptr, InPreBuildingMeshActor);
+	}
+	BroadcastPreBuildingActiveChanged(InCharacter, bInActive);
+
+	return true;
+}
+
 //—— 建造类 ——
 TSubclassOf<AHB_Building_Base> AHB_ConstructionManager::GetBuildingClass(ACharacter* InCharacter) const
 {
@@ -140,8 +238,11 @@ void AHB_ConstructionManager::SetBuildingClass(ACharacter* InCharacter, TSubclas
 	{
 		return;
 	}
+	const TSubclassOf<AHB_Building_Base> OldClass = Entry.BuildingClass;
 	Entry.BuildingClass = NewClass;
 	PreBuildingContainer.MarkItemDirty(Entry);
+	//服务端权威路径：FastArray 回调仅在客户端跑，这里显式派发，保证 Listen Server 同样能收到事件
+	BroadcastPreBuildingClassChanged(InCharacter, OldClass, NewClass);
 }
 
 //—— 预览体 Actor ——
@@ -165,8 +266,10 @@ void AHB_ConstructionManager::SetPreBuildingMeshActor(ACharacter* InCharacter, A
 	{
 		return;
 	}
+	APreBuilding* const OldActor = Entry.PreBuildingMeshActor;
 	Entry.PreBuildingMeshActor = NewActor;
 	PreBuildingContainer.MarkItemDirty(Entry);
+	BroadcastPreBuildingActorChanged(InCharacter, OldActor, NewActor);
 }
 
 //—— 激活状态 ——
@@ -191,8 +294,12 @@ void AHB_ConstructionManager::SetIsActive(ACharacter* InCharacter, bool bInActiv
 		return;
 	}
 	Entry.bIsActive = bInActive;
-	Entry.PreBuildingMeshActor->SetActorHiddenInGame(!bInActive);
+	if (Entry.PreBuildingMeshActor)
+    {
+        Entry.PreBuildingMeshActor->SetActorHiddenInGame(!bInActive);
+    }
 	PreBuildingContainer.MarkItemDirty(Entry);
+	BroadcastPreBuildingActiveChanged(InCharacter, bInActive);
 }
 
 bool AHB_ConstructionManager::GetActiveTickPos(ACharacter* InCharacter) const
@@ -233,6 +340,58 @@ void AHB_ConstructionManager::RemoveEntry(ACharacter* InCharacter)
 	{
 		//FastArray删除必须调用MarkArrayDirty，重建内部ItemMap
 		PreBuildingContainer.MarkArrayDirty();
+	}
+}
+
+//—— 统一派发入口：Manager → World → Subsystem，仅对外暴露 Subsystem 上的 BlueprintAssignable 委托 ——
+void AHB_ConstructionManager::BroadcastPreBuildingClassChanged(ACharacter* InCharacter, TSubclassOf<AHB_Building_Base> OldClass, TSubclassOf<AHB_Building_Base> NewClass)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (UHB_ConstructionSubsystem* Sys = World->GetSubsystem<UHB_ConstructionSubsystem>())
+	{
+		Sys->OnPreBuildingClassChanged.Broadcast(InCharacter, NewClass, OldClass);
+	}
+}
+
+void AHB_ConstructionManager::BroadcastPreBuildingActorChanged(ACharacter* InCharacter, APreBuilding* OldActor, APreBuilding* NewActor)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (UHB_ConstructionSubsystem* Sys = World->GetSubsystem<UHB_ConstructionSubsystem>())
+	{
+		Sys->OnPreBuildingActorChanged.Broadcast(InCharacter, NewActor, OldActor);
+	}
+}
+
+void AHB_ConstructionManager::BroadcastPreBuildingActiveChanged(ACharacter* InCharacter, bool bIsActive)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (UHB_ConstructionSubsystem* Sys = World->GetSubsystem<UHB_ConstructionSubsystem>())
+	{
+		Sys->OnPreBuildingActiveChanged.Broadcast(InCharacter, bIsActive);
 	}
 }
 

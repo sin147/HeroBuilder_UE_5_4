@@ -101,6 +101,11 @@ public:
 	//玩家登出时清理表项（仅服务端调用）
 	void RemoveEntry(ACharacter* InCharacter);
 
+	//—— 统一对外派发交互数据变化（服务端权威路径与客户端 FastArray 路径都收敛到这里） ——
+	void BroadcastInteractTypeChanged(ACharacter* InCharacter, EInteractType OldType, EInteractType NewType);
+	void BroadcastInteractModeChanged(ACharacter* InCharacter, EInteractMode OldMode, EInteractMode NewMode);
+	void BroadcastInteractTargetChanged(ACharacter* InCharacter, AActor* OldTarget, AActor* NewTarget);
+
 private:
 	//全玩家交互数据表（FastArray差量复制给所有客户端）
 	UPROPERTY(Replicated)

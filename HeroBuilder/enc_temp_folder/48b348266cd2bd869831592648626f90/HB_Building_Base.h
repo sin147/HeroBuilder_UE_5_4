@@ -33,7 +33,7 @@ private:
 	UPROPERTY(Replicated)
     TObjectPtr<AActor> Target;
 	UPROPERTY(Replicated)
-    TEnumAsByte<EBuildingState> CurrentState = EBuildingState::BS_Idle;
+    TEnumAsByte<EBuildingState> CurrentState = BS_Death;
 	bool SwitchState(EBuildingState NewState);
 	float Attack = 10.f;
 	float DeathTime = 10.f;

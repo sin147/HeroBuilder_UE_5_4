@@ -4,7 +4,10 @@
 #include "Subsystems/HB_CharacterSubsystem.h"
 #include "Subsystems/HB_ConstructionSubsystem.h"
 #include "Subsystems/HB_InteractSubsystem.h"
+#include "Subsystems/HB_DamageSubsystem.h"
+#include "Helper/HB_CharacterHelper.h"
 #include "HeroBuilder/HeroBuilderCharacter.h"
+#include "Building/HB_Building_Base.h"
 #include "Components/HB_DamageComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -245,8 +248,13 @@ bool UHB_CharacterSubsystem::CanSwitchState(ACharacter* InCharacter, EPlayerChar
 
 bool UHB_CharacterSubsystem::IsInteracting(AHeroBuilderCharacter* InCharacter)
 {
-	EPlayerCharacterState CurrentlyState = GetCurrentState(InCharacter);
-	return CurrentlyState==EPCS_Interact||CurrentlyState==EPCS_PostInteract||CurrentlyState==EPCS_PreInteract;
+	//通过 Helper 封装：纯枚举判断的工具方法收敛到 AHB_CharacterHelper，Subsystem 仅负责取状态并外发
+	AHB_CharacterHelper* Helper = GetHelper<AHB_CharacterHelper>();
+	if (!Helper)
+	{
+		return false;
+	}
+	return Helper->IsInteracting(GetCurrentState(InCharacter));
 }
 
 void UHB_CharacterSubsystem::OnEnterState(ACharacter* InCharacter, EPlayerCharacterState EnterState)
@@ -479,6 +487,13 @@ void UHB_CharacterSubsystem::TickCharacterState(ACharacter* InCharacter, float D
 	}
 	case EPCS_PreInteract:
     {
+		//交互过程中Target有效性兜底：统一走 InteractSubsystem 的业务语义判定。
+		//项目中 Building 的 BS_Death 等价于"待修建"仍可交互，详细规则见 CanInteractTarget。
+		if (!InteractSub->CanInteractTarget(InCharacter, InteractSub->GetInteractTarget(InCharacter)))
+		{
+			AbortInteract(InCharacter);
+			break;
+		}
 		//更新交互计时器：FindOrAdd 兜底，避免 SimulatedProxy 等未走过 OnEnterState 的端直接 operator[] 崩溃
 		float& Timer = CharacterInteractTimer.FindOrAdd(InCharacter);
 		Timer += DeltaTime;
@@ -490,6 +505,12 @@ void UHB_CharacterSubsystem::TickCharacterState(ACharacter* InCharacter, float D
     }
 	case EPCS_Interact:
     {
+		//交互过程中Target有效性兜底：统一走 InteractSubsystem 的业务语义判定。
+		if (!InteractSub->CanInteractTarget(InCharacter, InteractSub->GetInteractTarget(InCharacter)))
+		{
+			AbortInteract(InCharacter);
+			break;
+		}
 		//交互瞬时执行：触发交互后立即进入后摇
 		InteractSub->TryInteract(InCharacter);
 		SwitchState(InCharacter, EPCS_PostInteract);
@@ -497,12 +518,24 @@ void UHB_CharacterSubsystem::TickCharacterState(ACharacter* InCharacter, float D
     }
 	case EPCS_PostInteract:
     {
+		//交互过程中Target有效性兜底：统一走 InteractSubsystem 的业务语义判定。
+		if (!InteractSub->CanInteractTarget(InCharacter, InteractSub->GetInteractTarget(InCharacter)))
+		{
+			AbortInteract(InCharacter);
+			break;
+		}
 		//更新交互计时器：FindOrAdd 兜底
 		float& Timer = CharacterInteractTimer.FindOrAdd(InCharacter);
 		Timer += DeltaTime;
 		if (Timer >= InteractSub->GetPostInteractDelay(InCharacter))
 		{
-			SwitchState(InCharacter, EPCS_PreInteract);
+			//一轮交互结束 = 重新发起一次交互流程入口：
+			//复用 BeginInteractFlow 已有的"模式 / Target / 距离"分流策略，避免在 Tick 内重复实现出口决策。
+			//- IM_Construction：跳过追击，直接进入 PreInteract
+			//- Target 失效：BeginInteractFlow 内会落到 PreInteract（CanInteractTarget 兜底已在分支顶部处理）
+			//- Target 在 Range 内：进入下一轮 PreInteract（连段）
+			//- Target 走远：切到 MoveToTarget 重新追击，闭环回 PreInteract
+			BeginInteractFlow(InCharacter);
 		}
         break;
     }
@@ -511,7 +544,7 @@ void UHB_CharacterSubsystem::TickCharacterState(ACharacter* InCharacter, float D
 	}
 }
 
-//——————————————————————————————————————————————
+//————————————————————————————————————————————————
 // 追击目标
 //——————————————————————————————————————————————
 

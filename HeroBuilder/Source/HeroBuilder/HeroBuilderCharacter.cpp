@@ -158,6 +158,8 @@ void AHeroBuilderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 		// Interact：长按保持交互，抬起取消
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AHeroBuilderCharacter::OnInteractPressed);
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &AHeroBuilderCharacter::OnInteractReleased);
+		//Put
+		EnhancedInputComponent->BindAction(PutAction, ETriggerEvent::Started, this, &AHeroBuilderCharacter::Put);
 	}
 	else
 	{
@@ -204,6 +206,35 @@ void AHeroBuilderCharacter::Look(const FInputActionValue& Value)
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
+}
+
+void AHeroBuilderCharacter::Put(const FInputActionValue& Value)
+{
+	Server_Put();
+}
+
+void AHeroBuilderCharacter::Server_Put_Implementation()
+{
+	Multicast_Put();
+}
+
+void AHeroBuilderCharacter::Multicast_Put_Implementation()
+{
+	    EInteractMode InteractMode = GetWorld()->GetSubsystem<UHB_InteractSubsystem>()->GetInteractMode(this);
+
+    switch (InteractMode)
+    {
+    case IM_Normal:
+        break;
+    case IM_Construction:
+        if (UHB_ConstructionSubsystem* ConstructionSys = GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>())
+        {
+            ConstructionSys->PutBuilding(this);
+        }
+        break;
+    default:
+        break;
+    }
 }
 
 void AHeroBuilderCharacter::ChangeConstructionMode(const FInputActionValue& Value)
@@ -299,17 +330,17 @@ void AHeroBuilderCharacter::Server_AbortInteract_Implementation()
 
 void AHeroBuilderCharacter::Multicast_BeginInteract_Implementation()
 {
-	UHB_CharacterSubsystem* Sys = GetCharacterSubsystem();
-	if (!Sys)
+	UHB_CharacterSubsystem* CharSys = GetCharacterSubsystem();
+	if (!CharSys)
 	{
 		return;
 	}
-	const EPlayerCharacterState State = Sys->GetCurrentState(this);
+	const EPlayerCharacterState State = CharSys->GetCurrentState(this);
 	if (State != EPCS_Idle && State != EPCS_Move)
 	{
 		return;
 	}
-	Sys->BeginInteractFlow(this);
+	CharSys->BeginInteractFlow(this);
 }
 
 void AHeroBuilderCharacter::OnInteractReleased(const FInputActionValue& Value)
@@ -321,6 +352,7 @@ void AHeroBuilderCharacter::OnInteractReleased(const FInputActionValue& Value)
 
 void AHeroBuilderCharacter::Multicast_AbortInteract_Implementation()
 {
+
 	if (UHB_CharacterSubsystem* Sys = GetCharacterSubsystem())
 	{
 		Sys->AbortInteract(this);

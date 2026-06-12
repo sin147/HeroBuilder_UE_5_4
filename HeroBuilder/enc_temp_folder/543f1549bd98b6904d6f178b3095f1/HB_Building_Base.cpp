@@ -261,6 +261,12 @@ void AHB_Building_Base::BeginPlay()
 	{
 		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Building_Base::HandleHealthChanged);
 		DamageComponent->OnDeath.AddDynamic(this, &AHB_Building_Base::HandleDeath);
+		if (HasAuthority())
+		{
+			// 最大血量已在 InitialBuilding 中由配置写入 DamageComponent。
+			// 默认出生即“待修建”：把血量打成 0，触发 OnDeath -> HandleDeath，进入 BS_Death 并允许玩家在 IM_Normal 下治疗复活
+			DamageComponent->ApplyDamage(nullptr, DamageComponent->GetMaxHealth());
+		}
 	}
 }
 

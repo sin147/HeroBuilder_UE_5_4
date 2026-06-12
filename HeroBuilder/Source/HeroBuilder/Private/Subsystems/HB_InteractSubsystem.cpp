@@ -76,7 +76,8 @@ void UHB_InteractSubsystem::TickUpdateInteractTarget(float DeltaTime)
 				}
 
 				const float Dist = FVector::Dist(CharacterLocation, Actor->GetActorLocation());
-				if (Dist < MinDist)
+				//用统一的 CanInteractTarget 过滤候选项（Building 死亡可修复、其它实体死亡剔除等规则全部内聚到一处）
+				if (Dist < MinDist && CanInteractTarget(HBCharacter, Actor))
 				{
 					MinDist = Dist;
 					NewNearest = Actor;
@@ -94,13 +95,14 @@ void UHB_InteractSubsystem::TickUpdateInteractTarget(float DeltaTime)
 		}
 		const EInteractType CurrentMode = InteractMgr->GetCurrentInteractType(HBCharacter);
 		// 找到了有效目标 -> 设为 InteractTarget；否则清空。
+		// 走 Subsystem 入口以复用其交互态守卫（玩家处于交互三段时禁止修改 Target）
 		if (NewNearest)
 		{
-			InteractMgr->SetInteractTarget(HBCharacter, NewNearest);
+			SetInteractTarget(HBCharacter, NewNearest);
 		}
 		else
 		{
-			InteractMgr->SetInteractTarget(HBCharacter, nullptr);
+			SetInteractTarget(HBCharacter, nullptr);
 		}
 
 		// 同步当前角色的 InteractType（无有效目标 -> 回落到 IT_Normal）
@@ -175,10 +177,59 @@ AActor* UHB_InteractSubsystem::GetInteractTarget(ACharacter* InCharacter) const
 
 void UHB_InteractSubsystem::SetInteractTarget(ACharacter* InCharacter, AActor* Target)
 {
+	//玩家处于交互态（PreInteract / Interact / PostInteract）时，禁止修改 InteractTarget。
+	//收敛在最底层入口处守卫：Tick 自动选目标与外部主动调用 SetInteractTarget 都会被一起拦截。
+	if (AHeroBuilderCharacter* HBCharacter = Cast<AHeroBuilderCharacter>(InCharacter))
+	{
+		if (UHB_CharacterSubsystem* CharacterSys = GetWorld() ? GetWorld()->GetSubsystem<UHB_CharacterSubsystem>() : nullptr)
+		{
+			if (CharacterSys->IsInteracting(HBCharacter))
+			{
+				return;
+			}
+		}
+	}
 	if (AHB_InteractManager* InteractMgr = GetInteractManager())
 	{
 		InteractMgr->SetInteractTarget(InCharacter, Target);
 	}
+}
+
+bool UHB_InteractSubsystem::CanInteractTarget(ACharacter* InCharacter, AActor* Target) const
+{
+	//规则一：Target 缺失/被销毁 一律不可交互（无论 Mode）
+	if (!IsValid(Target))
+	{
+		//建造模式下 Target 可以缺省（由 ConstructionSubsystem 自行管理），直接放行
+		if (GetInteractMode(InCharacter) == IM_Construction)
+		{
+			return true;
+		}
+		return false;
+	}
+
+	//规则二：建造模式不依赖 Target，直接放行
+	if (GetInteractMode(InCharacter) == IM_Construction)
+	{
+		return true;
+	}
+	//规则四：其它实体（Resource/Enemy 等）由 DamageSubsystem 统一判定死亡
+	if (UWorld* World = GetWorld())
+	{
+		if (UHB_DamageSubsystem* DamageSub = World->GetSubsystem<UHB_DamageSubsystem>())
+		{
+			if (Target->IsA(AHB_Building_Base::StaticClass()))
+			{
+				return DamageSub->IsTargetDead(Target);
+			}
+			if (DamageSub->IsTargetDead(Target))
+			{
+				return false;
+			}
+		}
+
+	}
+	return true;
 }
 
 void UHB_InteractSubsystem::SwitchInteractType(ACharacter* InCharacter, EInteractType NewMode)
@@ -191,6 +242,15 @@ void UHB_InteractSubsystem::SwitchInteractType(ACharacter* InCharacter, EInterac
 	if (!HBCharacter)
 	{
 		return;
+	}
+	//玩家处于交互态（PreInteract / Interact / PostInteract）时，禁止修改 InteractType。
+	//收敛在最底层入口处守卫：Tick 自动同步交互类型与外部主动调用都会被一起拦截。
+	if (UHB_CharacterSubsystem* CharacterSys = GetWorld() ? GetWorld()->GetSubsystem<UHB_CharacterSubsystem>() : nullptr)
+	{
+		if (CharacterSys->IsInteracting(HBCharacter))
+		{
+			return;
+		}
 	}
 	AHB_InteractManager* InteractMgr = GetInteractManager();
 	if (!InteractMgr)
@@ -338,6 +398,15 @@ void UHB_InteractSubsystem::SwitchInteractMode(ACharacter* InCharacter, EInterac
 	if (!HBCharacter)
 	{
 		return;
+	}
+	//玩家处于交互态（PreInteract / Interact / PostInteract）时，禁止修改 InteractMode。
+	//收敛在最底层入口处守卫：玩家主动按键切换 Construction/Normal 等都会被一起拦截。
+	if (UHB_CharacterSubsystem* CharacterSys = GetWorld() ? GetWorld()->GetSubsystem<UHB_CharacterSubsystem>() : nullptr)
+	{
+		if (CharacterSys->IsInteracting(HBCharacter))
+		{
+			return;
+		}
 	}
 	AHB_InteractManager* InteractMgr = GetInteractManager();
 	if (!InteractMgr)
@@ -505,11 +574,6 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 	}
 	case IM_Construction:
 	{
-		if (UHB_ConstructionSubsystem* ConstructionSys = GetWorld()->GetSubsystem<UHB_ConstructionSubsystem>())
-		{
-			ConstructionSys->ConstructionBegin(InCharacter);
-		}
-		break;
 	}
 	default:
 		break;

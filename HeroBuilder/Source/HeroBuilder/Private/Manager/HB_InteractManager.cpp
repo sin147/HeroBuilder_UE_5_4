@@ -2,34 +2,60 @@
 
 
 #include "Manager/HB_InteractManager.h"
+#include "Subsystems/HB_InteractSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
 
 //—— FInteractEntry 的 FastArray 回调（客户端在收到 增/删/改 时被调用） ——
-//说明：UHB_InteractSubsystem 当前未提供面向交互类型/模式/目标的公开委托，
-//此处保留与原 OnRep_CharacterInteractArray 一致的占位语义；后续如需对外通知，
-//可在此通过反向指针 Container.OwnerManager → World → Subsystem 进行派发。
-void FInteractEntry::PreReplicatedRemove(const FFastArraySerializer& /*ArraySerializer*/)
+//说明：Item 回调内只反查 Manager，由 Manager 统一派发委托（与 ResourceManager 一致）
+void FInteractEntry::PreReplicatedRemove(const FFastArraySerializer& ArraySerializer)
 {
-	//占位：本条记录被移除，可在此触发本地清理（如取消高亮、隐藏交互提示）
+	//被移除时：分别广播 Type/Mode/Target 回到默认/空（按差量比较快照）
+	const FInteractContainer& Container = static_cast<const FInteractContainer&>(ArraySerializer);
+	AHB_InteractManager* Mgr = Container.OwnerManager.Get();
+	if (!Mgr)
+	{
+		return;
+	}
+	if (InteractTarget)
+	{
+		Mgr->BroadcastInteractTargetChanged(Character.Get(), InteractTarget, nullptr);
+	}
 }
 
-void FInteractEntry::PostReplicatedAdd(const FFastArraySerializer& /*ArraySerializer*/)
+void FInteractEntry::PostReplicatedAdd(const FFastArraySerializer& ArraySerializer)
 {
-	//首次到达：把当前值作为本地基线缓存，避免后续Change被误判
+	//首次到达：把当前值作为本地基线缓存，避免后续 Change 被误判
 	PreviousInteractType   = InteractType;
 	PreviousInteractMode   = InteractMode;
 	PreviousInteractTarget = InteractTarget;
-	//占位：本条记录被新增，可在此初始化本地表现
+
+	const FInteractContainer& Container = static_cast<const FInteractContainer&>(ArraySerializer);
+	AHB_InteractManager* Mgr = Container.OwnerManager.Get();
+	if (!Mgr)
+	{
+		return;
+	}
+	//首次到达：以 Old=默认 / Old=nullptr 形式派发当前值
+	Mgr->BroadcastInteractTypeChanged(Character.Get(), IT_Normal, InteractType);
+	Mgr->BroadcastInteractModeChanged(Character.Get(), IM_Normal, InteractMode);
+	if (InteractTarget)
+	{
+		Mgr->BroadcastInteractTargetChanged(Character.Get(), nullptr, InteractTarget);
+	}
 }
 
-void FInteractEntry::PostReplicatedChange(const FFastArraySerializer& /*ArraySerializer*/)
+void FInteractEntry::PostReplicatedChange(const FFastArraySerializer& ArraySerializer)
 {
-	//与 FCharacterStateEntry 一致：Item 内任意字段变化都会回调到此，需自行做差量比较
+	//Item 内任意字段变化都会回调到此，需自行做差量比较
 	const bool bTypeChanged   = (PreviousInteractType   != InteractType);
 	const bool bModeChanged   = (PreviousInteractMode   != InteractMode);
 	const bool bTargetChanged = (PreviousInteractTarget.Get() != InteractTarget);
+
+	const TEnumAsByte<EInteractType> OldType   = PreviousInteractType;
+	const TEnumAsByte<EInteractMode> OldMode   = PreviousInteractMode;
+	AActor* const                    OldTarget = PreviousInteractTarget.Get();
 
 	//刷新本地基线
 	PreviousInteractType   = InteractType;
@@ -40,7 +66,25 @@ void FInteractEntry::PostReplicatedChange(const FFastArraySerializer& /*ArraySer
 	{
 		return;
 	}
-	//占位：在此响应自己/他人交互类型/模式/目标的变更（如刷新UI/光标提示）
+
+	const FInteractContainer& Container = static_cast<const FInteractContainer&>(ArraySerializer);
+	AHB_InteractManager* Mgr = Container.OwnerManager.Get();
+	if (!Mgr)
+	{
+		return;
+	}
+	if (bTypeChanged)
+	{
+		Mgr->BroadcastInteractTypeChanged(Character.Get(), OldType, InteractType);
+	}
+	if (bModeChanged)
+	{
+		Mgr->BroadcastInteractModeChanged(Character.Get(), OldMode, InteractMode);
+	}
+	if (bTargetChanged)
+	{
+		Mgr->BroadcastInteractTargetChanged(Character.Get(), OldTarget, InteractTarget);
+	}
 }
 
 AHB_InteractManager::AHB_InteractManager()
@@ -135,8 +179,11 @@ void AHB_InteractManager::SetCurrentInteractType(ACharacter* InCharacter, EInter
 	{
 		return;
 	}
+	const EInteractType OldType = Entry.InteractType;
 	Entry.InteractType = NewType;
 	CharacterInteractContainer.MarkItemDirty(Entry);
+	//服务端权威路径：FastArray 回调仅在客户端跑，这里显式派发，保证 Listen Server 同样能收到事件
+	BroadcastInteractTypeChanged(InCharacter, OldType, NewType);
 }
 
 //—— 交互模式 ——
@@ -160,8 +207,10 @@ void AHB_InteractManager::SetCurrentInteractMode(ACharacter* InCharacter, EInter
 	{
 		return;
 	}
+	const EInteractMode OldMode = Entry.InteractMode;
 	Entry.InteractMode = NewMode;
 	CharacterInteractContainer.MarkItemDirty(Entry);
+	BroadcastInteractModeChanged(InCharacter, OldMode, NewMode);
 }
 
 //—— 交互目标 ——
@@ -185,8 +234,10 @@ void AHB_InteractManager::SetInteractTarget(ACharacter* InCharacter, AActor* Tar
 	{
 		return;
 	}
+	AActor* const OldTarget = Entry.InteractTarget;
 	Entry.InteractTarget = Target;
 	CharacterInteractContainer.MarkItemDirty(Entry);
+	BroadcastInteractTargetChanged(InCharacter, OldTarget, Target);
 }
 
 void AHB_InteractManager::RemoveEntry(ACharacter* InCharacter)
@@ -203,5 +254,57 @@ void AHB_InteractManager::RemoveEntry(ACharacter* InCharacter)
 	{
 		//FastArray删除必须调用MarkArrayDirty，重建内部ItemMap
 		CharacterInteractContainer.MarkArrayDirty();
+	}
+}
+
+//—— 统一派发入口：Manager → World → Subsystem，仅对外暴露 Subsystem 上的 BlueprintAssignable 委托 ——
+void AHB_InteractManager::BroadcastInteractTypeChanged(ACharacter* InCharacter, EInteractType OldType, EInteractType NewType)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (UHB_InteractSubsystem* Sys = World->GetSubsystem<UHB_InteractSubsystem>())
+	{
+		Sys->OnInteractTypeChanged.Broadcast(InCharacter, NewType, OldType);
+	}
+}
+
+void AHB_InteractManager::BroadcastInteractModeChanged(ACharacter* InCharacter, EInteractMode OldMode, EInteractMode NewMode)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (UHB_InteractSubsystem* Sys = World->GetSubsystem<UHB_InteractSubsystem>())
+	{
+		Sys->OnInteractModeChanged.Broadcast(InCharacter, NewMode, OldMode);
+	}
+}
+
+void AHB_InteractManager::BroadcastInteractTargetChanged(ACharacter* InCharacter, AActor* OldTarget, AActor* NewTarget)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (UHB_InteractSubsystem* Sys = World->GetSubsystem<UHB_InteractSubsystem>())
+	{
+		Sys->OnInteractTargetChanged.Broadcast(InCharacter, NewTarget, OldTarget);
 	}
 }

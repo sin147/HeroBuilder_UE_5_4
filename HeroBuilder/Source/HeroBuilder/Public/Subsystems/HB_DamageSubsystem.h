@@ -49,6 +49,10 @@ public:
 	UFUNCTION(BlueprintCallable)
     void TakeSphereRangeDamage(AActor* Attacker, float Damage,FVector Center, float Radius,ETargetType Targets);
 
+	//通过 DamageComponent 判断目标是否死亡：无 DamageComponent 视为非可死亡目标，返回 false
+	UFUNCTION(BlueprintPure, Category = "Damage")
+	bool IsTargetDead(AActor* Target) const;
+
 	virtual void Tick(float DeltaTime) override;
     virtual TStatId GetStatId() const override { return TStatId(); }
 };

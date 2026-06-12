@@ -105,11 +105,24 @@ public:
 	//是否存在该角色的Entry
 	bool HasEntry(ACharacter* InCharacter) const;
 
+	//一次性新增 Entry：原子写入 BuildingClass / PreBuildingMeshActor / bIsActive，并只标脏一次
+	//用于首次进入 ConstructionMode 等场景，避免分多次 Setter 调用导致客户端先收到 BuildingClass=nullptr 的中间态
+	//返回值：true=新增成功；false=Entry 已存在（不会修改任何字段，调用者应改用 SetXxx 进行更新）
+	bool AddEntry(ACharacter* InCharacter,
+	              TSubclassOf<AHB_Building_Base> InBuildingClass,
+	              APreBuilding* InPreBuildingMeshActor,
+	              bool bInActive);
+
 	//玩家登出时清理表项（仅服务端调用）
 	void RemoveEntry(ACharacter* InCharacter);
 
 	//遍历所有Entry（用于Tick等场景）
 	const TArray<FPreBuildingInfo>& GetAllEntries() const { return PreBuildingContainer.PreBuildingEntries; }
+
+	//—— 统一对外派发预览数据变化（服务端权威路径与客户端 FastArray 路径都收敛到这里） ——
+	void BroadcastPreBuildingClassChanged(ACharacter* InCharacter, TSubclassOf<AHB_Building_Base> OldClass, TSubclassOf<AHB_Building_Base> NewClass);
+	void BroadcastPreBuildingActorChanged(ACharacter* InCharacter, APreBuilding* OldActor, APreBuilding* NewActor);
+	void BroadcastPreBuildingActiveChanged(ACharacter* InCharacter, bool bIsActive);
 
 private:
 	//全玩家建造预览数据表（FastArray差量复制给所有客户端）

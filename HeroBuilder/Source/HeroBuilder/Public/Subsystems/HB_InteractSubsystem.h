@@ -13,6 +13,11 @@ class AHB_InteractManager;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogInteractSubsystem, Log, All);
 
+//—— 公开委托（蓝图可绑定）：客户端 FastArray 回调与服务端权威路径都收敛到这里 ——
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInteractTypeChanged, ACharacter*, Character, EInteractType, NewType, EInteractType, OldType);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInteractModeChanged, ACharacter*, Character, EInteractMode, NewMode, EInteractMode, OldMode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInteractTargetChanged, ACharacter*, Character, AActor*, NewTarget, AActor*, OldTarget);
+
 /**
  * 交互子系统
  * 负责管理所有玩家的交互模式与最近交互目标
@@ -46,6 +51,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interact")
 	AActor* GetInteractTarget(ACharacter* InCharacter) const;
 	void SetInteractTarget(ACharacter* InCharacter, AActor* Target);
+
+	//判断目标在当前 InteractMode 下是否仍可交互。
+	//用于：
+	//1. Tick 选取最近交互目标时过滤候选项
+	//2. 交互三段（PreInteract/Interact/PostInteract）兜底：目标失效则中断
+	//规则：
+	//  - Target=nullptr 或 已销毁 → 不可交互
+	//  - IM_Construction 模式 → 一律可交互（建造模式不依赖 Target，由 ConstructionSubsystem 自行管理）
+	//  - Target 是 Building → 只要存活（IsValid）即可交互，BS_Death=待修建可被修复，正常态可被攻击
+	//  - 其它（Resource/Enemy 等）→ DamageSubsystem 判定死亡则不可交互
+	UFUNCTION(BlueprintPure, Category = "Interact")
+	bool CanInteractTarget(ACharacter* InCharacter, AActor* Target) const;
 
 	//切换玩家交互模式
 	void SwitchInteractType(ACharacter* InCharacter, EInteractType NewMode);
@@ -87,4 +104,12 @@ public:
     float GetPostInteractDelay(ACharacter* InCharacter) const;
 	UFUNCTION(BlueprintCallable)
     float GetPostInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const;
+
+	//—— 公开委托：所有派发口收敛到 Manager.BroadcastXxx → 这里 Broadcast ——
+	UPROPERTY(BlueprintAssignable)
+	FOnInteractTypeChanged OnInteractTypeChanged;
+	UPROPERTY(BlueprintAssignable)
+	FOnInteractModeChanged OnInteractModeChanged;
+	UPROPERTY(BlueprintAssignable)
+	FOnInteractTargetChanged OnInteractTargetChanged;
 };

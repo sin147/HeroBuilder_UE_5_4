@@ -24,6 +24,21 @@ void UHB_DamageSubsystem::TakeDamage(AActor* Attacker, float Damage, AActor* Tar
 	}
 }
 
+bool UHB_DamageSubsystem::IsTargetDead(AActor* Target) const
+{
+	//无效目标统一视为"已死亡/不可用"，由调用方按需自行再做 IsValid 区分；这里只回答 DamageComponent 层面的存活判断
+	if (!IsValid(Target))
+	{
+		return true;
+	}
+	if (UHB_DamageComponent* Damage = Target->FindComponentByClass<UHB_DamageComponent>())
+	{
+		return Damage->IsDead();
+	}
+	//没有 DamageComponent 的目标不在伤害体系内，按"未死亡"处理（例如建造预览等纯交互对象）
+	return false;
+}
+
 void UHB_DamageSubsystem::TakeBoxRangeDamage(AActor* Attacker, float Damage, FVector StartLocation, FVector EndLocation, float Width, ETargetType Target)
 {
 	// 计算盒形长度（StartLocation到EndLocation的距离）

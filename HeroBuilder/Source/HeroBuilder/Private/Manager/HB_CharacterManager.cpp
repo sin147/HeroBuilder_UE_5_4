@@ -10,46 +10,29 @@
 //将 PreviousState 提升为可访问的“上次快照”：仅本地使用不参与复制，由客户端 PostReplicatedAdd/Change 维护
 //（由于字段位于 USTRUCT 内部且无 UPROPERTY，UE 不会复制该字段，只走进程内赋值）
 
-static void DispatchClientStateChanged(const FFastArraySerializer& InArraySerializer, ACharacter* InCharacter,
-	EPlayerCharacterState OldState, EPlayerCharacterState NewState)
-{
-	if (!IsValid(InCharacter))
-	{
-		return;
-	}
-	//反查容器 → Manager → World → Subsystem
-	const FCharacterStateContainer& Container = static_cast<const FCharacterStateContainer&>(InArraySerializer);
-	AHB_CharacterManager* Mgr = Container.OwnerManager.Get();
-	if (!IsValid(Mgr))
-	{
-		return;
-	}
-	UWorld* World = Mgr->GetWorld();
-	if (!World)
-	{
-		return;
-	}
-	UHB_CharacterSubsystem* Sys = World->GetSubsystem<UHB_CharacterSubsystem>();
-	if (!Sys)
-	{
-		return;
-	}
-	//客户端 FastArray 回调路径：直接 Broadcast 公开委托，与服务端权威路径产生一致的 Leave/Enter/Changed 通知
-	Sys->SwitchState(InCharacter, NewState);
-}
-
 //—— FCharacterStateEntry 的 FastArray 回调（客户端在收到 增/删/改 时被调用） ——
+//说明：Item 回调内只反查 Manager，由 Manager 统一派发委托（与 ResourceManager 一致）
+//不再在客户端调用 Subsystem::SwitchState（那是服务端权威推进函数，会再次写表/触发副作用）
 void FCharacterStateEntry::PreReplicatedRemove(const FFastArraySerializer& InArraySerializer)
 {
-	//被移除时视为 Leave 当前态（若仍有有效态）
-	DispatchClientStateChanged(InArraySerializer, Character.Get(), CurrentlyState, EPCS_None);
+	//被移除时视为 Leave 当前态（OldState=CurrentlyState, NewState=None）
+	const FCharacterStateContainer& Container = static_cast<const FCharacterStateContainer&>(InArraySerializer);
+	if (AHB_CharacterManager* Mgr = Container.OwnerManager.Get())
+	{
+		Mgr->BroadcastCharacterStateChanged(Character.Get(), CurrentlyState, EPCS_None);
+	}
 }
 
 void FCharacterStateEntry::PostReplicatedAdd(const FFastArraySerializer& InArraySerializer)
 {
-	//首次到达：若初始态非 None，则视为 Enter；OldState 传 None 表示不发 Leave
+	//首次到达：把当前值作为本地基线缓存，避免后续 Change 被误判
 	PreviousState = CurrentlyState;
-	DispatchClientStateChanged(InArraySerializer, Character.Get(), EPCS_None, CurrentlyState);
+	const FCharacterStateContainer& Container = static_cast<const FCharacterStateContainer&>(InArraySerializer);
+	if (AHB_CharacterManager* Mgr = Container.OwnerManager.Get())
+	{
+		//首次到达：OldState 传 None 表示不发 Leave
+		Mgr->BroadcastCharacterStateChanged(Character.Get(), EPCS_None, CurrentlyState);
+	}
 }
 
 void FCharacterStateEntry::PostReplicatedChange(const FFastArraySerializer& InArraySerializer)
@@ -62,7 +45,11 @@ void FCharacterStateEntry::PostReplicatedChange(const FFastArraySerializer& InAr
 		return;
 	}
 	PreviousState = NewState;
-	DispatchClientStateChanged(InArraySerializer, Character.Get(), OldState, NewState);
+	const FCharacterStateContainer& Container = static_cast<const FCharacterStateContainer&>(InArraySerializer);
+	if (AHB_CharacterManager* Mgr = Container.OwnerManager.Get())
+	{
+		Mgr->BroadcastCharacterStateChanged(Character.Get(), OldState, NewState);
+	}
 }
 
 AHB_CharacterManager::AHB_CharacterManager()
@@ -248,4 +235,33 @@ TArray<TObjectPtr<ACharacter>> AHB_CharacterManager::GetAllCharacters() const
 	}
 
     return Characters;
+}
+
+void AHB_CharacterManager::BroadcastCharacterStateChanged(ACharacter* InCharacter, EPlayerCharacterState OldState, EPlayerCharacterState NewState)
+{
+	if (!IsValid(InCharacter))
+	{
+		return;
+	}
+	//Manager → World → Subsystem，对外仅暴露 Subsystem 上的 BlueprintAssignable 委托
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	UHB_CharacterSubsystem* Sys = World->GetSubsystem<UHB_CharacterSubsystem>();
+	if (!Sys)
+	{
+		return;
+	}
+	//与服务端权威路径（SwitchState）保持一致的 Leave/Enter/Changed 三段式
+	if (OldState != EPCS_None)
+	{
+		Sys->OnCharacterLeaveState.Broadcast(InCharacter, OldState);
+	}
+	if (NewState != EPCS_None)
+	{
+		Sys->OnCharacterEnterState.Broadcast(InCharacter, NewState);
+	}
+	Sys->OnCharacterStateChanged.Broadcast(InCharacter, NewState, OldState);
 }
