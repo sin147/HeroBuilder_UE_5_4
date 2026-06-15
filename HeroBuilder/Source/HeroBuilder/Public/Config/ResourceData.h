@@ -75,24 +75,19 @@ private:
 	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "资源生成配置列表"))
 	TArray<FResourceSpawnConfig> ResourceSpawnConfigs;
 
-	//随机生成区域中心点
-	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "随机生成区域中心点"))
-	FVector SpawnAreaCenter = FVector::ZeroVector;
-
-	//随机生成区域范围（X/Y轴半径）
-	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "随机生成区域范围"))
-	FVector SpawnAreaExtent = FVector(2000.f, 2000.f, 0.f);
-
-	//无FreeGrid可用时，以玩家为中心的随机生成半径
-	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "玩家中心生成半径", ClampMin = "0.0"))
+	//无FreeGrid可用时，以玩家为中心的随机生成半径（外圆）
+	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "玩家中心生成半径(外圆)", ClampMin = "0.0"))
 	float SpawnRadiusAroundPlayer = 1500.f;
+
+	//以玩家为中心的禁止生成内圆半径，所有生成方式均生效（圆环 = 外圆 - 内圆 区域）
+	UPROPERTY(EditAnywhere, Category = "ResourceSpawn", meta = (DisplayName = "玩家中心禁止生成内圆半径", ClampMin = "0.0"))
+	float SpawnInnerRadiusAroundPlayer = 300.f;
 
 public:
 	FResourceConfig GetResourceInfoByResourceClass(TSubclassOf<AHB_Resource_Base> ResourceClass);
 	const TArray<FResourceSpawnConfig>& GetResourceSpawnConfigs() const { return ResourceSpawnConfigs; }
-	FVector GetSpawnAreaCenter() const { return SpawnAreaCenter; }
-	FVector GetSpawnAreaExtent() const { return SpawnAreaExtent; }
 	float GetSpawnRadiusAroundPlayer() const { return SpawnRadiusAroundPlayer; }
+	float GetSpawnInnerRadiusAroundPlayer() const { return SpawnInnerRadiusAroundPlayer; }
 	UFUNCTION(BlueprintPure)
 	UTexture2D* GetResourceTypeTexture(EResourceType ResourceType) const;
 

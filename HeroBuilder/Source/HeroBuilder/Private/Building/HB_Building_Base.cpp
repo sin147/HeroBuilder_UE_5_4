@@ -203,16 +203,34 @@ void AHB_Building_Base::InitialBuilding(FBuildingConfig InConfig)
 	PreAttackDelay = InConfig.PreAttackDelay;
 	PostAttackDelay = InConfig.PostAttackDelay;
 
+	//运行时兜底：与 PostInitializeComponents 保持一致策略，避免蓝图子类删除继承组件后此处静默跳过
+	if (!DamageComponent)
+	{
+		DamageComponent = FindComponentByClass<UHB_DamageComponent>();
+	}
+	if (!InteractComponent)
+	{
+		InteractComponent = FindComponentByClass<UHB_InteractComponent>();
+	}
+
 	//最大血量直接落到 DamageComponent，由组件管理（仅服务端需要写入，组件内部会校验 Authority）
 	if (DamageComponent)
 	{
 		DamageComponent->InitHealth(InConfig.MaxHealth);
+	}
+	else
+	{
+		UE_LOG(LogBuilding, Error, TEXT("[%s] InitialBuilding: DamageComponent missing, MaxHealth=%.1f not applied"), *GetName(), InConfig.MaxHealth);
 	}
 
 	//将配置中的交互类型应用到 InteractComponent，覆盖构造函数中的默认值（IT_Attack）
 	if (InteractComponent)
 	{
 		InteractComponent->SetInteractType(InConfig.InteractType);
+	}
+	else
+	{
+		UE_LOG(LogBuilding, Error, TEXT("[%s] InitialBuilding: InteractComponent missing, InteractType not applied"), *GetName());
 	}
 }
 
@@ -255,12 +273,33 @@ bool AHB_Building_Base::SwitchState(EBuildingState NewState)
 void AHB_Building_Base::BeginPlay()
 {
 	Super::BeginPlay();
+	//委托绑定已迁移至 PostInitializeComponents（更早、且不受蓝图 BeginPlay 是否调 Parent 影响）
+}
 
-	// 绑定伤害组件回调
+void AHB_Building_Base::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	//运行时兜底：蓝图子类若把继承的 DamageComponent / InteractComponent 删除或覆盖，
+	//C++ 指针在 CDO 后会被写回 nullptr，但实例仍可能以匿名子对象形式存在，按类型查找拿回。
+	if (!DamageComponent)
+	{
+		DamageComponent = FindComponentByClass<UHB_DamageComponent>();
+	}
+	if (!InteractComponent)
+	{
+		InteractComponent = FindComponentByClass<UHB_InteractComponent>();
+	}
+
 	if (DamageComponent)
 	{
 		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Building_Base::HandleHealthChanged);
 		DamageComponent->OnDeath.AddDynamic(this, &AHB_Building_Base::HandleDeath);
+		DamageComponent->OnRevive.AddDynamic(this, &AHB_Building_Base::HandleRevive);
+	}
+	else
+	{
+		UE_LOG(LogBuilding, Error, TEXT("[%s] DamageComponent missing in both CDO and runtime, health callbacks will NOT fire"), *GetName());
 	}
 }
 
@@ -273,21 +312,6 @@ void AHB_Building_Base::Tick(float DeltaTime)
 
 void AHB_Building_Base::HandleHealthChanged(float OldHealth, float NewHealth, float MaxHealthValue, AActor* Attacker)
 {
-	// 服务端判定“待修建建筑被治满”→ 复活为 BS_Idle，重新作为可被攻击的正常建筑
-	if (HasAuthority() && CurrentState == EBuildingState::BS_Death && NewHealth >= MaxHealthValue - KINDA_SMALL_NUMBER)
-	{
-		CurrentState = EBuildingState::BS_Idle; // 绕开 SwitchState 的“BS_Death 锁定”
-		WasFindTarget = false;
-		CurrentAttackDelay = 0.f;
-		if (InteractComponent)
-		{
-			// 复活后作为可被攻击的目标（默认 IT_None
-			InteractComponent->SetInteractType(IT_Normal);
-			InteractComponent->SetIsInteractable(true);
-		}
-		UE_LOG(LogBuilding, Log, TEXT("%s revived from BS_Death to BS_Idle (Health=%.1f/%.1f)"), *GetName(), NewHealth, MaxHealthValue);
-	}
-
 	// 调用蓝图可重写的 OnHealthChanged 接口
 	OnHealthChanged(OldHealth, NewHealth, MaxHealthValue, Attacker);
 }
@@ -323,6 +347,7 @@ float AHB_Building_Base::GetCombatRange() const
 {
     return CombatRange;
 }
+
 void AHB_Building_Base::StartRotate()
 {
 	SwitchState(EBuildingState::BS_Rotate);
@@ -360,7 +385,7 @@ bool AHB_Building_Base::IsValidTarget(AActor* InTarget) const
 	return false;
 }
 
-void AHB_Building_Base::HandleDeath(AActor* Attacker)
+void AHB_Building_Base::HandleDeath()
 {
 	SwitchState(EBuildingState::BS_Death);
 	// 建筑“死亡”在本项目中的语义 = “待修建”：仍然保持可交互，但交互类型切为 IT_Construction，
@@ -370,6 +395,21 @@ void AHB_Building_Base::HandleDeath(AActor* Attacker)
 		InteractComponent->SetInteractType(IT_Construction);
 		InteractComponent->SetIsInteractable(true);
 	}
+	OnDeath();
+}
+void AHB_Building_Base::HandleRevive()
+{
+	SwitchState(EBuildingState::BS_Idle);
+	if (InteractComponent)
+	{
+		CurrentState = EBuildingState::BS_Idle; // 绕开 SwitchState 的“BS_Death 锁定”
+		WasFindTarget = false;
+		CurrentAttackDelay = 0.f;
+		InteractComponent->SetInteractType(IT_Construction);
+		InteractComponent->SetIsInteractable(false);
+        UE_LOG(LogBuilding, Log, TEXT("%s revived from BS_Death to BS_Idle (Health=%.1f/%.1f)"), *GetName(), DamageComponent->GetCurrentHealth(), DamageComponent->GetMaxHealth());
+	}
+	OnRevive();
 }
 
 void AHB_Building_Base::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

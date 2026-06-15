@@ -17,12 +17,13 @@ void UHB_DamageComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 服务端初始化当前血量
+	// 不再在此处主动写 CurrentHealth：
+	// Owner（Building / Enemy / Resource）会在自身 BeginPlay 之后通过 InitHealth(配置值) 完成权威初始化。
+	// 若过早在此写一次默认 MaxHealth(=100) 会导致客户端先看到 100 再看到配置值的跳变。
 	if (AActor* Owner = GetOwner())
 	{
 		if (Owner->HasAuthority())
 		{
-			CurrentHealth = MaxHealth;
 			bIsDead = false;
 		}
 	}
@@ -37,7 +38,6 @@ void UHB_DamageComponent::InitHealth(float InMaxHealth)
 	}
 
 	MaxHealth = InMaxHealth;
-	const float OldHealth = CurrentHealth;
 	CurrentHealth = MaxHealth;
 	bIsDead = false;
 }
@@ -76,29 +76,34 @@ void UHB_DamageComponent::ApplyDamage(AActor* Attacker, float Damage)
 	{
 		bIsDead = true;
 		// 服务端等价OnRep派发：本端立即派发死亡
-		OnDeath.Broadcast(Attacker);
+		OnDeath.Broadcast();
 	}
 	HealthChangeInfo.Damage = Damage;
 	HealthChangeInfo.Attacker = Attacker;
 	HealthChangeInfo.MaxHealth = MaxHealth;
 	HealthChangeInfo.OldHealth = OldHealth;
 	HealthChangeInfo.NewHealth = NewHealth;
-	HealthChangeInfo.bIsDead = bIsDead;
+
 }
 
 void UHB_DamageComponent::OnRep_HealthChange()
 {
 	UE_LOG(LogDamageComponent, Log, TEXT("Client %s health changed, health: %.1f -> %.1f"),
 		*GetOwner()->GetName(), HealthChangeInfo.OldHealth, HealthChangeInfo.NewHealth);
-    if (HealthChangeInfo.bIsDead)
+	OnHealthChanged.Broadcast(HealthChangeInfo.OldHealth, HealthChangeInfo.NewHealth, HealthChangeInfo.MaxHealth, HealthChangeInfo.Attacker);
+
+}
+
+void UHB_DamageComponent::OnRep_DeathChange()
+{
+	if(bIsDead)
 	{
-		OnDeath.Broadcast(HealthChangeInfo.Attacker);
+		OnDeath.Broadcast();
 	}
 	else
 	{
-		OnHealthChanged.Broadcast(HealthChangeInfo.OldHealth, HealthChangeInfo.NewHealth, HealthChangeInfo.MaxHealth, HealthChangeInfo.Attacker);
+		OnRevive.Broadcast();
 	}
-
 }
 
 void UHB_DamageComponent::Heal(float HealAmount)
@@ -123,7 +128,6 @@ void UHB_DamageComponent::Heal(float HealAmount)
 	HealthChangeInfo.MaxHealth = MaxHealth;
 	HealthChangeInfo.OldHealth = OldHealth;
     HealthChangeInfo.NewHealth = CurrentHealth;
-    HealthChangeInfo.bIsDead = bIsDead;
 }
 
 void UHB_DamageComponent::Revive(float NewHealth)
@@ -150,11 +154,11 @@ void UHB_DamageComponent::Revive(float NewHealth)
 	{
 		// 服务端等价OnRep派发
 		OnHealthChanged.Broadcast(OldHealth, CurrentHealth, MaxHealth, nullptr);
+		OnRevive.Broadcast();
 	}
 	HealthChangeInfo.MaxHealth = MaxHealth;
 	HealthChangeInfo.OldHealth = OldHealth;
 	HealthChangeInfo.NewHealth = CurrentHealth;
-	HealthChangeInfo.bIsDead = bIsDead;
 }
 
 void UHB_DamageComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

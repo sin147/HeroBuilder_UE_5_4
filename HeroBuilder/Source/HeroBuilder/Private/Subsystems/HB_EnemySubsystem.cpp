@@ -117,25 +117,25 @@ void UHB_EnemySubsystem::TickSpawnEnemy()
 				UE_LOG(LogEnemySubsystem, Log, TEXT("Spawning enemy - Class: %s, Location: %s"), 
 					*OutItem.Key->GetName(), *OutItem.Value.GetLocation().ToString());
 				
-				//生成敌人
-				TObjectPtr<AHB_Enemy_Base> DeferredEnemy = GetWorld()->SpawnActorDeferred<AHB_Enemy_Base>(OutItem.Key, OutItem.Value);
-				if (IsValid(DeferredEnemy))
+				//生成敌人（一步式 Spawn：BeginPlay 在 SpawnActor 内部就已执行完毕）
+				//注意：因此 InitialEnemy 会在 BeginPlay 之后才调用，依赖配置参数的初始化要在 InitialEnemy 内部自行处理。
+				TObjectPtr<AHB_Enemy_Base> NewEnemy = GetWorld()->SpawnActor<AHB_Enemy_Base>(OutItem.Key, OutItem.Value);
+				if (IsValid(NewEnemy))
 				{
 					//初始化敌人数据
 					if (IsValid(EnemyData))
 					{
-						DeferredEnemy->InitialEnemy(EnemyData->GetEnemyInfoByEnemyClass(OutItem.Key));
+						NewEnemy->InitialEnemy(EnemyData->GetEnemyInfoByEnemyClass(OutItem.Key));
 					}
 					else
 					{
 						UE_LOG(LogEnemySubsystem, Warning, TEXT("EnemyData is not valid, using default enemy config"));
 						FEnemyConfig DefaultConfig;
-						DeferredEnemy->InitialEnemy(DefaultConfig);
+						NewEnemy->InitialEnemy(DefaultConfig);
 					}
-					
-					UE_LOG(LogEnemySubsystem, Log, TEXT("Successfully spawned enemy: %s"), *DeferredEnemy->GetName());
-					GetManager<AHB_EnemyManager>()->AddEnemy(DeferredEnemy);
-					DeferredEnemy->FinishSpawning(OutItem.Value);
+
+					UE_LOG(LogEnemySubsystem, Log, TEXT("Successfully spawned enemy: %s"), *NewEnemy->GetName());
+					GetManager<AHB_EnemyManager>()->AddEnemy(NewEnemy);
 				}
 				else
 				{

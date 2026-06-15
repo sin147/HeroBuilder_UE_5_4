@@ -93,17 +93,17 @@ public:
 	void TryInteract(ACharacter* InCharacter);
 	//获取交互动画
 	UFUNCTION(BlueprintCallable)
-	UAnimSequence* GetInteractAnim(EInteractMode InteractMode, EInteractType InteractType) const;
+	UAnimSequence* GetInteractAnim(EInteractType InteractType) const;
 	//获取玩家交互延迟
 	UFUNCTION(BlueprintCallable)
 	float GetPreInteractDelay(ACharacter* InCharacter) const;
 	UFUNCTION(BlueprintCallable)
-	float GetPreInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const;
+	float GetPreInteractDelayByEnum(EInteractType InteractType) const;
 	//获取玩家交互延迟
 	UFUNCTION(BlueprintCallable)
     float GetPostInteractDelay(ACharacter* InCharacter) const;
 	UFUNCTION(BlueprintCallable)
-    float GetPostInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const;
+    float GetPostInteractDelayByEnum(EInteractType InteractType) const;
 
 	//—— 公开委托：所有派发口收敛到 Manager.BroadcastXxx → 这里 Broadcast ——
 	UPROPERTY(BlueprintAssignable)

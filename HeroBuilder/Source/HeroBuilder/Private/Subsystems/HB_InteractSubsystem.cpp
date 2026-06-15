@@ -582,31 +582,31 @@ void UHB_InteractSubsystem::TryInteract(ACharacter* InCharacter)
 
 }
 
-UAnimSequence* UHB_InteractSubsystem::GetInteractAnim(EInteractMode InteractMode, EInteractType InteractType) const
+UAnimSequence* UHB_InteractSubsystem::GetInteractAnim(EInteractType InteractType) const
 {
 	if (!InteractData)
 	{
 		return nullptr;
 	}
-    return InteractData->GetInteractAnimation(InteractMode, InteractType);
+    return InteractData->GetInteractAnimation(InteractType);
 }
 
 float UHB_InteractSubsystem::GetPreInteractDelay(ACharacter* InCharacter) const
 {
-	return InteractData->GetPreInteractDelay(GetInteractMode(InCharacter), GetInteractType(InCharacter));
+	return InteractData->GetPreInteractDelay(GetInteractType(InCharacter));
 }
 
-float UHB_InteractSubsystem::GetPreInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const
+float UHB_InteractSubsystem::GetPreInteractDelayByEnum(EInteractType InteractType) const
 {
-    return InteractData->GetPreInteractDelay(InteractMode, InteractType);
+    return InteractData->GetPreInteractDelay(InteractType);
 }
 
 float UHB_InteractSubsystem::GetPostInteractDelay(ACharacter* InCharacter) const
 {
-	return InteractData->GetPostInteractDelay(GetInteractMode(InCharacter), GetInteractType(InCharacter));
+	return InteractData->GetPostInteractDelay(GetInteractType(InCharacter));
 }
 
-float UHB_InteractSubsystem::GetPostInteractDelayByEnum(EInteractMode InteractMode, EInteractType InteractType) const
+float UHB_InteractSubsystem::GetPostInteractDelayByEnum(EInteractType InteractType) const
 {
-    return InteractData->GetPostInteractDelay(InteractMode, InteractType);
+    return InteractData->GetPostInteractDelay(InteractType);
 }

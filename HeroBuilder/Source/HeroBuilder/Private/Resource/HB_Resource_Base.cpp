@@ -94,11 +94,32 @@ void AHB_Resource_Base::BeginPlay()
 	Super::BeginPlay();
 	NetMode = GetWorld()->GetNetMode();
 
-	// 绑定伤害组件回调
+	//委托绑定已迁移至 PostInitializeComponents（更早、且不受蓝图 BeginPlay 是否调 Parent 影响）
+}
+
+void AHB_Resource_Base::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	//运行时兜底：蓝图子类若把继承的 DamageComponent / InteractComponent 删除或覆盖，
+	//C++ 指针在 CDO 后会被写回 nullptr，但实例仍可能以匿名子对象形式存在，按类型查找拿回。
+	if (!DamageComponent)
+	{
+		DamageComponent = FindComponentByClass<UHB_DamageComponent>();
+	}
+	if (!InteractComponent)
+	{
+		InteractComponent = FindComponentByClass<UHB_InteractComponent>();
+	}
+
 	if (DamageComponent)
 	{
 		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Resource_Base::HandleHealthChanged);
 		DamageComponent->OnDeath.AddDynamic(this, &AHB_Resource_Base::HandleDeath);
+	}
+	else
+	{
+		UE_LOG(LogResource, Error, TEXT("[%s] DamageComponent missing in both CDO and runtime, health callbacks will NOT fire"), *GetName());
 	}
 }
 
@@ -155,7 +176,7 @@ void AHB_Resource_Base::HandleHealthChanged(float OldHealth, float NewHealth, fl
 
 }
 
-void AHB_Resource_Base::HandleDeath(AActor* Attacker)
+void AHB_Resource_Base::HandleDeath()
 {
 	SwitchState(RS_Death);
 	OnDeath();
@@ -257,9 +278,24 @@ void AHB_Resource_Base::InitialResource(const FResourceConfig& InConfig)
 {
 	UE_LOG(LogResource, Log, TEXT("Initializing resource - Name: %s, Type: %d, Health: %.1f, Amount: %d"),
 		*InConfig.ResourceName, static_cast<int32>(InConfig.ResourceType), InConfig.Health, InConfig.ResourceAmount);
+
+	//运行时兜底：与 PostInitializeComponents 保持一致策略，避免蓝图子类删除继承组件后此处静默跳过
+	if (!DamageComponent)
+	{
+		DamageComponent = FindComponentByClass<UHB_DamageComponent>();
+	}
+	if (!InteractComponent)
+	{
+		InteractComponent = FindComponentByClass<UHB_InteractComponent>();
+	}
+
 	if (DamageComponent)
 	{
 		DamageComponent->InitHealth(InConfig.Health);
+	}
+	else
+	{
+		UE_LOG(LogResource, Error, TEXT("[%s] InitialResource: DamageComponent missing, Health=%.1f not applied"), *GetName(), InConfig.Health);
 	}
 	RecoverDelay = InConfig.RecoverDelay;
 	RecoverSpeed = InConfig.RecoverSpeed;
@@ -270,6 +306,10 @@ void AHB_Resource_Base::InitialResource(const FResourceConfig& InConfig)
 	if (InteractComponent)
 	{
 		InteractComponent->SetInteractType(InConfig.InteractMode);
+	}
+	else
+	{
+		UE_LOG(LogResource, Error, TEXT("[%s] InitialResource: InteractComponent missing, InteractMode not applied"), *GetName());
 	}
 }
 

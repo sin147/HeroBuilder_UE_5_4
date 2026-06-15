@@ -82,15 +82,37 @@ void AHB_Enemy_Base::BeginPlay()
 	NetMode=GetWorld()->GetNetMode();
 	AIController = GetController<AAIController>();
 
-	// 绑定伤害组件回调
+	//委托绑定已迁移至 PostInitializeComponents（更早、且不受蓝图 BeginPlay 是否调 Parent 影响）
+	//这里只保留服务端权威的初始血量写入（依赖 HasAuthority，必须在 BeginPlay 时机执行）
+	if (DamageComponent && HasAuthority())
+	{
+		DamageComponent->InitHealth(MaxHealth);
+	}
+}
+
+void AHB_Enemy_Base::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	//运行时兜底：蓝图子类若把继承的 DamageComponent / InteractComponent 删除或覆盖，
+	//C++ 指针在 CDO 后会被写回 nullptr，但实例仍可能以匿名子对象形式存在，按类型查找拿回。
+	if (!DamageComponent)
+	{
+		DamageComponent = FindComponentByClass<UHB_DamageComponent>();
+	}
+	if (!InteractComponent)
+	{
+		InteractComponent = FindComponentByClass<UHB_InteractComponent>();
+	}
+
 	if (DamageComponent)
 	{
 		DamageComponent->OnHealthChanged.AddDynamic(this, &AHB_Enemy_Base::HandleHealthChanged);
 		DamageComponent->OnDeath.AddDynamic(this, &AHB_Enemy_Base::HandleDeath);
-		if (HasAuthority())
-		{
-			DamageComponent->InitHealth(MaxHealth);
-		}
+	}
+	else
+	{
+		UE_LOG(LogEnemy, Error, TEXT("[%s] DamageComponent missing in both CDO and runtime, health callbacks will NOT fire"), *GetName());
 	}
 }
 bool AHB_Enemy_Base::IsValidTarget(TObjectPtr<AActor> InBuilding)
@@ -107,7 +129,7 @@ void AHB_Enemy_Base::HandleHealthChanged(float OldHealth, float NewHealth, float
 	OnHealthChanged(OldHealth, NewHealth, MaxHealthValue, Attacker);
 }
 
-void AHB_Enemy_Base::HandleDeath(AActor* Attacker)
+void AHB_Enemy_Base::HandleDeath()
 {
 	SwitchState(EEnemyState::ES_Death);
 	if (InteractComponent)
@@ -403,9 +425,18 @@ void AHB_Enemy_Base::InitialEnemy(const FEnemyConfig& InConfig)
 	}
 
 	//将配置中的交互类型应用到 InteractComponent，覆盖构造函数中的默认值（IT_Attack）
+	//运行时兜底：与 PostInitializeComponents 保持一致策略，避免蓝图子类删除继承组件后此处静默跳过
+	if (!InteractComponent)
+	{
+		InteractComponent = FindComponentByClass<UHB_InteractComponent>();
+	}
 	if (InteractComponent)
 	{
 		InteractComponent->SetInteractType(InConfig.InteractType);
+	}
+	else
+	{
+		UE_LOG(LogEnemy, Error, TEXT("[%s] InitialEnemy: InteractComponent missing, InteractType not applied"), *GetName());
 	}
 
 	// 记录配置信息（可以根据需要添加更多属性设置）

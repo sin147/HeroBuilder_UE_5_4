@@ -54,7 +54,10 @@ private:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	UPROPERTY(EditAnywhere, Category = "Attribute")
+	//在所有组件创建/注册完成、属性首次复制之前调用：用于绑定 DamageComponent 委托，
+	//避免在 BeginPlay 时机才绑定导致首包 OnRep 派发被错过；同时对蓝图子类删除/覆盖继承组件做运行时兜底。
+	virtual void PostInitializeComponents() override;
+	UPROPERTY(BlueprintReadOnly,EditAnywhere, Category = "Attribute")
 	TObjectPtr<UStaticMeshComponent> RotateMesh;
 	UPROPERTY(EditAnywhere, Category = "Attribute")
 	TObjectPtr<UStaticMeshComponent> BaseMesh;
@@ -86,6 +89,11 @@ protected:
 	//攻击表现
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnAttack(AActor* InTarget);
+	//死亡表现
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnDeath();
+	UFUNCTION(BlueprintImplementableEvent)
+	void OnRevive();
 
 	bool bIsServer;
 	UPROPERTY(Replicated,BlueprintReadOnly, Category = "Attribute", meta = (AllowPrivateAccess = true))
@@ -109,7 +117,10 @@ protected:
 
 	/** 由DamageComponent委托回调：死亡 */
 	UFUNCTION()
-	void HandleDeath(AActor* Attacker);
+	void HandleDeath();
+	/** 由DamageComponent委托回调：复活 */
+	UFUNCTION()
+	void HandleRevive();
 
 public:	
 	void InitialBuilding(FBuildingConfig InConfig);

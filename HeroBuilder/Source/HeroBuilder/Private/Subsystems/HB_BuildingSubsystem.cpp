@@ -200,9 +200,10 @@ void UHB_BuildingSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass
 		}
 	}
 
-	//生成建筑
-	TObjectPtr<AHB_Building_Base> DeferredBuilding = GetWorld()->SpawnActorDeferred<AHB_Building_Base>(InClass, InTransform);
-	if (!IsValid(DeferredBuilding))
+	//生成建筑（一步式 Spawn：BeginPlay 在 SpawnActor 内部就已执行完毕）
+	//注意：因此 InitialBuilding 会在 BeginPlay 之后才调用，依赖配置参数的初始化要在 InitialBuilding 内部自行处理。
+	TObjectPtr<AHB_Building_Base> NewBuilding = GetWorld()->SpawnActor<AHB_Building_Base>(InClass, InTransform);
+	if (!IsValid(NewBuilding))
 	{
 		UE_LOG(LogBuildingSystem, Error, TEXT("Failed to spawn building: %s"), *InClass->GetName());
 		return;
@@ -211,20 +212,19 @@ void UHB_BuildingSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass
 	//初始化建筑数据
 	if (IsValid(BuildingData))
 	{
-		DeferredBuilding->InitialBuilding(BuildingData->GetBuildingInfoByBuildingClass(InClass));
+		NewBuilding->InitialBuilding(BuildingData->GetBuildingInfoByBuildingClass(InClass));
 	}
 	else
 	{
 		UE_LOG(LogBuildingSystem, Warning, TEXT("BuildingData is not valid, using default building config"));
 		FBuildingConfig DefaultConfig;
-		DeferredBuilding->InitialBuilding(DefaultConfig);
+		NewBuilding->InitialBuilding(DefaultConfig);
 	}
 
-	UE_LOG(LogBuildingSystem, Log, TEXT("Successfully spawned building: %s"), *DeferredBuilding->GetName());
-	GetManager<AHB_BuildingManager>()->AddBuilding(DeferredBuilding);
-	DeferredBuilding->FinishSpawning(InTransform);
+	UE_LOG(LogBuildingSystem, Log, TEXT("Successfully spawned building: %s"), *NewBuilding->GetName());
+	GetManager<AHB_BuildingManager>()->AddBuilding(NewBuilding);
 
-	OnSpawnBuilding.Broadcast(DeferredBuilding, InTransform);
+	OnSpawnBuilding.Broadcast(NewBuilding, InTransform);
 }
 
 void UHB_BuildingSubsystem::SpawnBuildingAtGrid(TSubclassOf<AHB_Building_Base> InClass, int32 InX, int32 InY, const FRotator& InRotation, const FVector& InScale)

@@ -137,13 +137,79 @@ FTransform UHB_ResourceSubsystem::GetRandomSpawnTransform() const
 	UHB_GridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UHB_GridSubsystem>();
 	const float GridWidth = (GridSubsystem ? static_cast<float>(GridSubsystem->GetGridWidth()) : 100.f);
 
+	//读取生成圆环参数（外圆 / 内圆）
+	float OuterRadius = 1500.f;
+	float InnerRadius = 0.f;
+	if (IsValid(ResourceData))
+	{
+		OuterRadius = ResourceData->GetSpawnRadiusAroundPlayer();
+		InnerRadius = ResourceData->GetSpawnInnerRadiusAroundPlayer();
+	}
+	//防御：内圆不应大于等于外圆，否则圆环为空，回退为外圆全开
+	if (InnerRadius < 0.f)
+	{
+		InnerRadius = 0.f;
+	}
+	if (InnerRadius >= OuterRadius)
+	{
+		UE_LOG(LogResourceSubsystem, Warning, TEXT("SpawnInnerRadius(%.1f) >= SpawnOuterRadius(%.1f), fallback InnerRadius=0"), InnerRadius, OuterRadius);
+		InnerRadius = 0.f;
+	}
+	const float InnerRadiusSq = InnerRadius * InnerRadius;
+
+	//收集当前所有有效玩家位置（FreeGrid 与回退分支共用）
+	TArray<FVector> ValidPlayerLocations;
+	ValidPlayerLocations.Reserve(CachedPlayerControllers.Num());
+	for (const TWeakObjectPtr<APlayerController>& Weak : CachedPlayerControllers)
+	{
+		if (APlayerController* PC = Weak.Get())
+		{
+			if (APawn* Pawn = PC->GetPawn())
+			{
+				ValidPlayerLocations.Add(Pawn->GetActorLocation());
+			}
+		}
+	}
+
+	//仅当存在玩家且 InnerRadius>0 时才需要做内圆排除
+	auto IsInsideAnyPlayerInnerCircle = [&](const FVector& Location) -> bool
+	{
+		if (InnerRadius <= 0.f || ValidPlayerLocations.Num() == 0)
+		{
+			return false;
+		}
+		for (const FVector& PlayerLoc : ValidPlayerLocations)
+		{
+			const float DX = Location.X - PlayerLoc.X;
+			const float DY = Location.Y - PlayerLoc.Y;
+			if (DX * DX + DY * DY < InnerRadiusSq)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+
 	FVector SpawnLocation = FVector::ZeroVector;
 
-	//优先：从FreeGrid中随机选一个可用格子作为生成点
+	//优先：从FreeGrid中随机选一个可用格子作为生成点（剔除落入任意玩家内圆的格子）
 	TArray<FGridInfo> FreeGrids;
 	if (GridSubsystem)
 	{
 		FreeGrids = GridSubsystem->GetFreeGridIndexs();
+	}
+
+	//先把 FreeGrids 中处于内圆范围内的剔除，再做随机挑选；这样不会出现"挑到再丢弃导致永远空转"的问题
+	if (!FreeGrids.IsEmpty() && InnerRadius > 0.f && ValidPlayerLocations.Num() > 0)
+	{
+		FreeGrids.RemoveAll([&](const FGridInfo& Grid)
+		{
+			const FVector GridCenter(
+				Grid.X * GridWidth + GridWidth * 0.5f,
+				Grid.Y * GridWidth + GridWidth * 0.5f,
+				0.f);
+			return IsInsideAnyPlayerInnerCircle(GridCenter);
+		});
 	}
 
 	if (!FreeGrids.IsEmpty())
@@ -158,36 +224,20 @@ FTransform UHB_ResourceSubsystem::GetRandomSpawnTransform() const
 	}
 	else
 	{
-		//回退：以当前玩家为中心，在指定半径内随机生成
-		float Radius = 1500.f;
-		if (IsValid(ResourceData))
-		{
-			Radius = ResourceData->GetSpawnRadiusAroundPlayer();
-		}
-
+		//回退：以当前玩家为中心，在 [InnerRadius, OuterRadius] 圆环内随机生成
 		FVector PlayerCenter = FVector::ZeroVector;
-		//从所有已登录玩家中收集出有效的Pawn
-		TArray<APawn*> ValidPawns;
-		ValidPawns.Reserve(CachedPlayerControllers.Num());
-		for (const TWeakObjectPtr<APlayerController>& Weak : CachedPlayerControllers)
-		{
-			if (APlayerController* PC = Weak.Get())
-			{
-				if (APawn* Pawn = PC->GetPawn())
-				{
-					ValidPawns.Add(Pawn);
-				}
-			}
-		}
 		//随机选一个玩家作为生成中心
-		if (ValidPawns.Num() > 0)
+		if (ValidPlayerLocations.Num() > 0)
 		{
-			const int32 PickIndex = FMath::RandRange(0, ValidPawns.Num() - 1);
-			PlayerCenter = ValidPawns[PickIndex]->GetActorLocation();
+			const int32 PickIndex = FMath::RandRange(0, ValidPlayerLocations.Num() - 1);
+			PlayerCenter = ValidPlayerLocations[PickIndex];
 		}
 
 		const float Angle = FMath::FRandRange(0.f, 2.f * PI);
-		const float Dist = FMath::FRandRange(0.f, Radius);
+		//在圆环 [InnerRadius, OuterRadius] 内做面积均匀采样：r = sqrt(lerp(Inner^2, Outer^2, rand))
+		const float OuterRadiusSq = OuterRadius * OuterRadius;
+		const float RSq = FMath::FRandRange(InnerRadiusSq, OuterRadiusSq);
+		const float Dist = FMath::Sqrt(RSq);
 		SpawnLocation = PlayerCenter + FVector(FMath::Cos(Angle) * Dist, FMath::Sin(Angle) * Dist, 0.f);
 		SpawnLocation.Z = 0.f;
 	}

@@ -12,10 +12,9 @@ struct FInteractInfo
 {
 	GENERATED_BODY()
 public:
-	//该条配置对应的交互类型（同一InteractMode下用以区分多种交互行为）
-	//作为该条记录的Key：由 RefreshInteractAnimations 自动按枚举补齐，编辑器内只读不可改
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "InteractData", meta = (AllowPrivateAccess = "true"))
-	TEnumAsByte<EInteractType> InteractType = IT_None;
+	//说明：本结构体作为 TMap<EInteractType, FInteractInfo> 的 Value，
+	//      EInteractType 由 Map 的 Key 表达，因此这里不再冗余存储 InteractType 字段，
+	//      避免出现"Map Key 与 Item.InteractType 不一致"的脏数据风险。
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InteractData", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimSequence> InteractAnimation;
@@ -27,18 +26,6 @@ public:
 	float PostInteractDelay=2;
 };
 
-//Wrapper：UE 反射不支持 TMap<..., TArray<...>>，需要用一层 USTRUCT 包一层
-USTRUCT(BlueprintType)
-struct FInteractInfoArray
-{
-	GENERATED_BODY()
-public:
-	//Items 集合由 RefreshInteractAnimations 按 EInteractType 自动补齐/裁剪：
-	//用户不能在编辑器中自行增删条目，仅能修改条目内字段（动画/距离/前后摇）
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InteractData", meta = (EditFixedOrder), EditFixedSize)
-	TArray<FInteractInfo> Items;
-};
-
 /**
  * 
  */
@@ -47,35 +34,35 @@ class HEROBUILDER_API UInteractData : public UDataAsset
 {
 	GENERATED_BODY()
 private:
-	//以 InteractMode 为 Key 的配置表；同一 Mode 下可挂多条 FInteractInfo（按 InteractType 区分）。
-	//Map 的 Key 集合由 RefreshInteractAnimations 在编辑器内按枚举自动补齐/裁剪。
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InteractData", meta = (AllowPrivateAccess = "true", ReadOnlyKeys), EditFixedSize)
-	TMap<TEnumAsByte<EInteractMode>, FInteractInfoArray> InteractAnimations;
+	//交互配置表：按 EInteractType 作为 Key 一个枚举一条记录，集合由 RefreshInteractAnimations 自动补齐缺失 Key / 副除非法 Key。
+	//用户在编辑器中不能自行增删条目，仅能修改条目内字段（动画/距离/前后摇）。
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InteractData", meta = (AllowPrivateAccess = "true",ReadOnlyKeys), EditFixedSize)
+	TMap<TEnumAsByte<EInteractType>,FInteractInfo> InteractAnimations;
 
 public:
-	//按 (Mode, Type) 查表获取该条配置的字段
+	//按 InteractType 查表获取该条配置的字段
 	UFUNCTION(BlueprintCallable, Category = "InteractData")
-	UAnimSequence* GetInteractAnimation(EInteractMode InteractMode, EInteractType InteractType);
+	UAnimSequence* GetInteractAnimation(EInteractType InteractType);
 	UFUNCTION(BlueprintCallable, Category = "InteractData")
-	float GetInteractDistance(EInteractMode InteractMode, EInteractType InteractType);
+	float GetInteractDistance(EInteractType InteractType);
 	UFUNCTION(BlueprintCallable, Category = "InteractData")
-	float GetPreInteractDelay(EInteractMode InteractMode, EInteractType InteractType);
+	float GetPreInteractDelay(EInteractType InteractType);
 	UFUNCTION(BlueprintCallable, Category = "InteractData")
-	float GetPostInteractDelay(EInteractMode InteractMode, EInteractType InteractType);
+	float GetPostInteractDelay(EInteractType InteractType);
 
 #if WITH_EDITOR
 protected:
-	//新建/构造时初始化 Map
+	//新建/构造时初始化 Items
 	virtual void PostInitProperties() override;
 	//从磁盘加载时补齐新增枚举
 	virtual void PostLoad() override;
 
 private:
-	//遍历 EInteractManagerInteractMode 所有枚举值，将缺失的 Key 补齐到 InteractAnimations，并剔除非法 Key
+	//遍历 EInteractType 所有枚举值，将缺失的 Type Key 补齐到 InteractAnimations，并剔除枚举中已不存在的非法 Key
 	void RefreshInteractAnimations();
 #endif
 
 private:
-	//查表辅助：在 Mode 数组中按 Type 查找；找不到返回 nullptr
-	const FInteractInfo* FindInfoByType(EInteractMode InteractMode, EInteractType InteractType) const;
+	//查表辅助：按 Type 查找；找不到返回 nullptr
+	const FInteractInfo* FindInfoByType(EInteractType InteractType) const;
 };

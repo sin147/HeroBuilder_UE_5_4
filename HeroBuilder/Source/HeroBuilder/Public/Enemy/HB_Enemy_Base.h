@@ -66,6 +66,9 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	//在所有组件创建/注册完成、属性首次复制之前调用：用于绑定 DamageComponent 委托，
+	//避免在 BeginPlay 时机才绑定导致首包 OnRep 派发被错过；同时对蓝图子类删除/覆盖继承组件做运行时兜底。
+	virtual void PostInitializeComponents() override;
 
 	/** 血量显示 Widget 组件，可在蓝图中指定 WidgetClass */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
@@ -115,7 +118,7 @@ protected:
 
 	/** 由DamageComponent委托回调：死亡 */
 	UFUNCTION()
-	void HandleDeath(AActor* Attacker);
+	void HandleDeath();
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
