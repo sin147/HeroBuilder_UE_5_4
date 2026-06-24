@@ -4,6 +4,7 @@
 #include "Subsystems/HB_GridSubsystem.h"
 #include "Subsystems/HB_BuildingSubsystem.h"
 #include "Subsystems/HB_ResourceSubsystem.h"
+#include "Grid/HB_Grid_Base.h"
 #include "Manager/HB_GridManager.h"
 
 DEFINE_LOG_CATEGORY(LogGridSubsystem);
@@ -46,13 +47,27 @@ void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	{
 		UE_LOG(LogGridSubsystem, Error, TEXT("Failed to get ResourceSubsystem"));
 	}
+
+	// 根据 GridData 中配置的 Area Level 列表，依次从中心向外生成区域
+	if (IsValid(GridData))
+	{
+		const TArray<int32> AllLevels = GridData->GetAllAreaLevels();
+		for (int32 Level : AllLevels)
+		{
+			SpawnAreaByLevel(Level);
+		}
+	}
+	else
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("OnWorldBeginPlay: GridData is null, skip spawning areas"));
+	}
 }
-int32 UHB_GridSubsystem::GetGridWidth() const
+int32 UHB_GridSubsystem::GetGridWidthFragment() const
 {
     int32 Ret = 0;
 	if (IsValid(GridData))
 	{
-        Ret = GridData->GetGridWidth();
+        Ret = GridData->GetGridWidthFragment();
     }
 	else
 	{
@@ -61,19 +76,20 @@ int32 UHB_GridSubsystem::GetGridWidth() const
     return Ret;
 }
 
-int32 UHB_GridSubsystem::GetGridHeight() const
+int32 UHB_GridSubsystem::GetGridLengthFragment() const
 {
     int32 Ret = 0;
-    if (IsValid(GridData))
-    {
-        Ret = GridData->GetGridHeight();
+	if (IsValid(GridData))
+	{
+        Ret = GridData->GetGridLengthFragment();
     }
-    else
-    {
-        UE_LOG(LogGridSubsystem, Error, TEXT("GridData is null"));
-    }
+	else
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("GridData is null"));
+	}
     return Ret;
 }
+
 TArray<FGridInfo> UHB_GridSubsystem::GetUsedGridIndexs()
 {
 	return GetManager<AHB_GridManager>()->GetUsedGridInfo();
@@ -116,16 +132,73 @@ FVector2D UHB_GridSubsystem::CalulateGridIndexByLocation(const FVector& Location
 		UE_LOG(LogGridSubsystem, Error, TEXT("CalulateGridIndexByLocation: GridData is null"));
 		return FVector2D::ZeroVector;
 	}
-	const int32 Width = GridData->GetGridWidth();
+	const int32 Width = GridData->GetGridWidthFragment();
 	if (Width == 0)
 	{
-		UE_LOG(LogGridSubsystem, Error, TEXT("CalulateGridIndexByLocation: GridWidth is 0, cannot divide"));
+		UE_LOG(LogGridSubsystem, Error, TEXT("CalulateGridIndexByLocation: GridWidthFragment is 0, cannot divide"));
 		return FVector2D::ZeroVector;
 	}
 	int X = FMath::Floor(Location.X / Width);
 	int Y = FMath::Floor(Location.Y / Width);
 
 	return FVector2D(X,Y);
+}
+void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
+{
+	FAreaConfig AreaConfig;
+	if(!GridData->GetAreaConfigByLevel(Level, AreaConfig))
+	{
+		UE_LOG(LogGridSubsystem, Warning, TEXT("SpawnAreaByLevel: No AreaConfig for Level %d"), Level);
+		return;
+	}
+    //单个Grid的宽度
+    int32 GridWidth = GridData->GetGridWidthFragment()*100;
+	int32 GridLength = GridData->GetGridLengthFragment()*100;
+
+    //获取Grid类
+    TSubclassOf<AHB_Grid_Base> GridClass = GridData->GetGridClassByLevel(Level);
+
+	//Level == 0 时只在中心生成一个Grid，避免上下边重叠
+	if (Level == 0)
+	{
+		SpawnGrid(GridClass, FVector::ZeroVector, FRotator::ZeroRotator);
+		return;
+	}
+
+	//单边Grid数量
+	int32 GridCount = Level * 2 + 1;
+    //左上角位置
+	FVector2D LeftUpPos = FVector2D(-GridWidth * Level, GridLength * Level);
+    //右上角位置
+    FVector2D RightUpPos = FVector2D(GridWidth*Level, GridLength * Level);
+	//左下角位置
+	FVector2D LeftDownPos = FVector2D(-GridWidth * Level, -GridLength * Level);
+	//右下角位置
+	FVector2D RightDownPos = FVector2D(GridWidth * Level, -GridLength * Level);
+
+	//根据等级生成区域
+    //生成X方向的区域（上下两条横边）
+    for(int32 i=0; i<GridCount; i++)
+    {
+		//生成上边的区域
+        SpawnGrid(GridClass, FVector(LeftUpPos.X + i * GridWidth, LeftUpPos.Y, 0), FRotator::ZeroRotator);
+        //生成下边的区域
+        SpawnGrid(GridClass, FVector(LeftDownPos.X + i * GridWidth, LeftDownPos.Y, 0), FRotator::ZeroRotator);
+	}
+	//生成Y方向的区域（左右两条竖边，去掉四个角避免和横边重复）
+    for(int32 i=1; i<GridCount-1; i++)
+	{
+		//生成左边的区域
+		SpawnGrid(GridClass,FVector(LeftDownPos.X, LeftDownPos.Y + i * GridLength, 0), FRotator::ZeroRotator);
+		//生成右边的区域
+        SpawnGrid(GridClass,FVector(RightDownPos.X, RightDownPos.Y + i * GridLength, 0), FRotator::ZeroRotator);
+	}
+
+}
+void UHB_GridSubsystem::SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation)
+{
+    GetWorld()->SpawnActor<AHB_Grid_Base>(GridClass, Location, Rotation);
+    
 }
 void UHB_GridSubsystem::OnSpawnBuilding(AHB_Building_Base* NewBuilding, FTransform SpawnTransform)
 {

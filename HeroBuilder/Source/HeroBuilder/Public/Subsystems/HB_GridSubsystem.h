@@ -11,6 +11,8 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogGridSubsystem, Log, All);
 class AHB_Building_Base;
 class AHB_Resource_Base;
+class AHB_Grid_Base;
+
 /**
  * 
  */
@@ -25,13 +27,11 @@ private:
 	void OnDestroyBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);
 	void OnSpawnResource(AHB_Resource_Base* InResource, FTransform InTransform);
 	void OnDestroyResource(AHB_Resource_Base* InResource, FTransform InTransform);
-	int WitdhSize;
-	int HeightSize;
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
-    int32 GetGridWidth() const;	
-	int32 GetGridHeight() const;
+    int32 GetGridWidthFragment() const;	
+	int32 GetGridLengthFragment() const;
 	TArray<FGridInfo> GetUsedGridIndexs();
 	TArray<FGridInfo> GetFreeGridIndexs();
 	//查询指定 Grid 是否已被占用（被建筑/资源占用则为 true）
@@ -41,4 +41,7 @@ public:
 	//防止同一格在网络延迟窗口内被玩家重复触发建造。等服务端权威 Replicate 回来时会被覆盖刷新。
 	void OccupyGrid(int32 InX, int32 InY);
 	FVector2D CalulateGridIndexByLocation(const FVector& Location) const;
+	UFUNCTION(BlueprintCallable)
+	void SpawnAreaByLevel(int32 Level);
+    void SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation);
 };

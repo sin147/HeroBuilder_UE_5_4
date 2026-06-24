@@ -135,7 +135,7 @@ int32 UHB_ResourceSubsystem::GetAliveResourceCountByClass(TSubclassOf<AHB_Resour
 FTransform UHB_ResourceSubsystem::GetRandomSpawnTransform() const
 {
 	UHB_GridSubsystem* GridSubsystem = GetWorld()->GetSubsystem<UHB_GridSubsystem>();
-	const float GridWidth = (GridSubsystem ? static_cast<float>(GridSubsystem->GetGridWidth()) : 100.f);
+	const float GridWidth = (GridSubsystem ? static_cast<float>(GridSubsystem->GetGridWidthFragment()) : 100.f);
 
 	//读取生成圆环参数（外圆 / 内圆）
 	float OuterRadius = 1500.f;

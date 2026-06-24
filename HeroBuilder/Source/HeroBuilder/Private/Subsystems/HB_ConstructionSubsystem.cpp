@@ -33,8 +33,7 @@ void UHB_ConstructionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UHB_ConstructionSubsystem::PostInitialize()
 {
 	Super::PostInitialize();
-	GridWidth = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridWidth();
-	GridHeight = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridHeight();
+	GridWidth = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridWidthFragment();
 	NetMode = GetWorld()->GetNetMode();
 }
 
