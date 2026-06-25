@@ -7,6 +7,9 @@
 AHB_Base_Helper::AHB_Base_Helper()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+	// Helper 引用通过 GameState 复制到客户端，本身需要被网络识别
+	bReplicates = true;
 }
 
 // Called when the game starts or when spawned

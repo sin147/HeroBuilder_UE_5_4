@@ -49,7 +49,7 @@ public:
 	void ActiveConstructionMode(TObjectPtr<ACharacter>InCharacter);
 	void CancelConstructionMode(TObjectPtr<ACharacter>InCharacter);
 
-	//获取单例 ConstructionManager：统一走基类 GetManager<T>()，服务端读 GameMode、客户端读已复制的 GameState
+	//获取单例 ConstructionManager：统一走基类 GetManager<T>()，服务端/客户端均从已复制的 GameState 读取
 	AHB_ConstructionManager* GetConstructionManager();
 
 	//—— 公开委托：所有派发口收敛到 Manager.BroadcastXxx → 这里 Broadcast ——

@@ -4,8 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
-#include "Kismet/GameplayStatics.h"
-#include "../HeroBuilderGameMode.h"
+#include "Engine/World.h"
 #include "../HeroBuilderGameState.h"
 #include "HB_WorldSubsystem_Base.generated.h"
 
@@ -26,6 +25,11 @@ public:
 	 virtual void Deinitialize() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
+
+	/**
+	 * 服务端/客户端通用：通过 GameState 获取已复制的 Manager。
+	 * Manager 的存储已统一迁移到 GameState（ReplicatedManagers）。
+	 */
 	template <typename T>
 	T* GetManager()
 	{
@@ -34,33 +38,30 @@ public:
 		{
 			return nullptr;
 		}
-
-		// 服务端：走 GameMode 的快路径（保持原行为）
-		if (AHeroBuilderGameMode* GM = Cast<AHeroBuilderGameMode>(UGameplayStatics::GetGameMode(World)))
-		{
-			if (T* Mgr = GM->GetManager<T>())
-			{
-				return Mgr;
-			}
-		}
-
-		// 客户端：GameMode 在客户端为 null，从 GameState 读取已复制过来的 Manager 列表
 		if (AHeroBuilderGameState* GS = World->GetGameState<AHeroBuilderGameState>())
 		{
 			return GS->GetManager<T>();
 		}
-
 		return nullptr;
 	}
+
+	/**
+	 * 服务端/客户端通用：通过 GameState 获取已复制的 Helper。
+	 * Helper 的存储已统一迁移到 GameState（ReplicatedHelpers）。
+	 */
 	template <typename T>
 	T* GetHelper()
 	{
-		AHeroBuilderGameMode* GM = Cast<AHeroBuilderGameMode>(UGameplayStatics::GetGameMode(this->GetWorld()));
-		if (!GM)
+		UWorld* World = this->GetWorld();
+		if (!World)
 		{
 			return nullptr;
 		}
-		return GM->GetHelper<T>();
+		if (AHeroBuilderGameState* GS = World->GetGameState<AHeroBuilderGameState>())
+		{
+			return GS->GetHelper<T>();
+		}
+		return nullptr;
 	}
 
 };

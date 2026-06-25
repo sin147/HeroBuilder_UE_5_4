@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Subsystems/HB_EnemySubsystem.h"
 #include "Components/HB_DamageComponent.h"
+#include "Subsystems/HB_GridSubsystem.h"
 #include "Components/HB_InteractComponent.h"
 
 DEFINE_LOG_CATEGORY(LogEnemy)
@@ -194,10 +195,17 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		}
 		if (FVector::Distance(GetActorLocation(), Target->GetActorLocation()) > CombatRange)
 		{
-			if(Status != EPathFollowingStatus::Moving)
-			{
-				AIController->MoveToActor(Target);
-			}
+            //获取下一个路点
+            FVector NextPoint = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetNextNavigationPoint(this);
+
+			// 1. 计算角色到路点的世界方向
+            FVector Dir = (NextPoint - GetActorLocation()).GetSafeNormal();
+
+			// 2. 旋转角色朝向移动方向（AI标准转向）
+			SetControlRotation(Dir.Rotation());
+
+			// 3. 给Pawn叠加移动输入（真正驱动Movement的API）
+			Char->AddMovementInput(Dir, 1.0f);
 		}
 		else
 		{

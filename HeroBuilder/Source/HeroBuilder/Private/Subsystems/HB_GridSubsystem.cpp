@@ -6,6 +6,10 @@
 #include "Subsystems/HB_ResourceSubsystem.h"
 #include "Grid/HB_Grid_Base.h"
 #include "Manager/HB_GridManager.h"
+#include "NavMesh/NavMeshBoundsVolume.h"
+#include "NavigationSystem.h"
+#include "Components/BrushComponent.h"
+#include "Engine/CollisionProfile.h"
 
 DEFINE_LOG_CATEGORY(LogGridSubsystem);
 
@@ -27,6 +31,7 @@ void UHB_GridSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	GridManager = GetWorld()->SpawnActor<AHB_GridManager>();
 	// 订阅新建筑生成通知
 	if (UHB_BuildingSubsystem* Building=GetWorld()->GetSubsystem<UHB_BuildingSubsystem>())
 	{
@@ -56,6 +61,48 @@ void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		{
 			SpawnAreaByLevel(Level);
 		}
+
+		// =============== 动态生成导航网格 范围体并重建导航 ===============
+		// 计算 NavMesh 覆盖范围：以最大 Level 为依据，覆盖所有已生成的区域
+		const int32 MaxLevel = AllLevels.Num() > 0 ? AllLevels.Last() : 0;
+		const int32 GridWidthCm = GridData->GetGridWidthFragment() * 100;
+		const int32 GridLengthCm = GridData->GetGridLengthFragment() * 100;
+		// 单边 Grid 数量 = MaxLevel*2+1，总边长 = GridCount * GridWidth
+		const int32 GridCount = MaxLevel * 2 + 1;
+		// HalfExtent 加一些 padding（底部向下额外预留），以保证完全包含地形
+		const FVector NavBoundsExtent(
+			GridCount * GridWidthCm * 0.5f + 200.0f,
+			GridCount * GridLengthCm * 0.5f + 200.0f,
+			1000.0f);
+
+		// 1. 动态生成 NavMeshBoundsVolume（以世界原点为中心）
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ANavMeshBoundsVolume* NewNavBounds = GetWorld()->SpawnActor<ANavMeshBoundsVolume>(
+			ANavMeshBoundsVolume::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+
+		if (NewNavBounds && NewNavBounds->GetBrushComponent())
+		{
+			// NavMeshBoundsVolume 默认 Brush 是 200x200x200 的立方体，通过缩放达到目标范围
+			// (默认 HalfExtent = 100，所以 Scale = TargetExtent / 100)
+			NewNavBounds->SetActorScale3D(NavBoundsExtent / 100.0f);
+
+			// 2. 通知导航系统更新该 Volume
+			if (UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld()))
+			{
+				NavSys->OnNavigationBoundsUpdated(NewNavBounds);
+				// 针对导航网格范围 Bounds 重建导航（局部重建，性能较优）
+				NavSys->Build();
+			}
+			UE_LOG(LogGridSubsystem, Log, TEXT("OnWorldBeginPlay: Spawned NavMeshBoundsVolume Extent=%s"),
+				*NavBoundsExtent.ToString());
+		}
+		else
+		{
+			UE_LOG(LogGridSubsystem, Error, TEXT("OnWorldBeginPlay: Failed to spawn NavMeshBoundsVolume"));
+		}
+
+		UE_LOG(LogGridSubsystem, Log, TEXT("OnWorldBeginPlay: Spawned %d areas"), AllLevels.Num());
 	}
 	else
 	{
@@ -195,10 +242,25 @@ void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
 	}
 
 }
-void UHB_GridSubsystem::SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation)
+AHB_Grid_Base* UHB_GridSubsystem::SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation)
 {
-    GetWorld()->SpawnActor<AHB_Grid_Base>(GridClass, Location, Rotation);
-    
+    return GetWorld()->SpawnActor<AHB_Grid_Base>(GridClass, Location, Rotation);
+}
+FVector UHB_GridSubsystem::GetNextNavigationPoint(FVector CurrentLocation, FVector TargetLocation)
+{
+	// 计算朝向（仅在 XY 平面内，忽略 Z 轴差异，避免高度差导致斜率计算异常）
+	FVector Delta = TargetLocation - CurrentLocation;
+	Delta.Z = 0.0f;
+	const FVector Direction = Delta.GetSafeNormal();
+	//预测步长
+	float StepX = Direction.X * 100;
+	float StepY = Direction.Y * 100;
+	//计算下一个点
+	float NextX = CurrentLocation.X + StepX;
+	float NextY = CurrentLocation.Y + StepY;
+
+    const FVector NextPoint = FVector(NextX, NextY, CurrentLocation.Z);
+	return NextPoint;
 }
 void UHB_GridSubsystem::OnSpawnBuilding(AHB_Building_Base* NewBuilding, FTransform SpawnTransform)
 {

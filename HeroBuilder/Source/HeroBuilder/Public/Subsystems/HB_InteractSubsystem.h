@@ -44,7 +44,7 @@ protected:
 	virtual void OnPlayerLogin(AGameModeBase* GameMode, APlayerController* PlayerController) override;
 	virtual void OnPlayerLogout(AGameModeBase* GameMode, AController* Exiting) override;
 public:
-	//获取单例 InteractManager：统一走基类 GetManager<T>()，服务端读 GameMode、客户端读已复制的 GameState
+	//获取单例 InteractManager：统一走基类 GetManager<T>()，服务端/客户端均从已复制的 GameState 读取
 	AHB_InteractManager* GetInteractManager();
 
 	//—— 交互目标（透传Manager） ——

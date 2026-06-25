@@ -23,6 +23,7 @@ class HEROBUILDER_API UHB_GridSubsystem : public UHB_WorldSubsystem_Base
 private:
 	UPROPERTY()
 	TObjectPtr<UGridData> GridData;
+    TObjectPtr<AHB_GridManager> GridManager;
 	void OnSpawnBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);
 	void OnDestroyBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);
 	void OnSpawnResource(AHB_Resource_Base* InResource, FTransform InTransform);
@@ -43,5 +44,7 @@ public:
 	FVector2D CalulateGridIndexByLocation(const FVector& Location) const;
 	UFUNCTION(BlueprintCallable)
 	void SpawnAreaByLevel(int32 Level);
-    void SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation);
+    AHB_Grid_Base* SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation);
+
+	FVector GetNextNavigationPoint(FVector CurrentLocation, FVector TargetLocation);
 };

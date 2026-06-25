@@ -161,8 +161,8 @@ void UHB_InteractSubsystem::OnPlayerLogout(AGameModeBase* GameMode, AController*
 
 AHB_InteractManager* UHB_InteractSubsystem::GetInteractManager()
 {
-	//统一走基类通道：服务端读 GameMode 的 Manager 列表，客户端读 GameState 上已复制的 Manager 列表。
-	//Manager 的创建交给 AHeroBuilderGameMode::StartPlay 统一 Spawn，子系统不再自行 Spawn。
+	//统一走基类通道：服务端/客户端均通过 GameState 上已复制的 Manager 列表获取。
+	//Manager 的创建已交给 AHeroBuilderGameState::SpawnAllManagersAndHelpers 统一 Spawn，子系统不再自行 Spawn。
 	return GetManager<AHB_InteractManager>();
 }
 
