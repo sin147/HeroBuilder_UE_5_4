@@ -33,7 +33,6 @@ void UHB_ConstructionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UHB_ConstructionSubsystem::PostInitialize()
 {
 	Super::PostInitialize();
-	GridWidth = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetGridWidthFragment();
 	NetMode = GetWorld()->GetNetMode();
 }
 
@@ -155,24 +154,6 @@ void UHB_ConstructionSubsystem::ActiveConstructionMode(TObjectPtr<ACharacter>InC
 			//重复进入，忽略
 			return;
 		}
-	// if (!IsValid(Mgr->GetPreBuildingMeshActor(InCharacter)))
-	// {
-	// 	APreBuilding* NewPreStaticMeshActor = GetWorld()->SpawnActor<APreBuilding>();
-	// 	if (!NewPreStaticMeshActor)
-	// 	{
-	// 		UE_LOG(LogConstructionSubsystem, Warning, TEXT("Failed to spawn PreStaticMeshActor"));
-	// 		return;
-	// 	}
-	// 	UStaticMesh* PreBuildingMesh = GetWorld()->GetSubsystem<UHB_BuildingSubsystem>()->GetBuildingPreviewMesh(DefaultBuildingClass);
-	// 	Mgr->SetPreBuildingMeshActor(InCharacter, NewPreStaticMeshActor);
-	// 	NewPreStaticMeshActor->SetStaticMesh(PreBuildingMesh);
-	// }
-	// //每次激活时检测当前 BuildingClass 是否有效，无效则回退到默认值并刷新预览 Mesh
-	// if (!IsValid(Mgr->GetBuildingClass(InCharacter)))
-	// {
-	// 	Mgr->SetBuildingClass(InCharacter, DefaultBuildingClass);
-	// 	UE_LOG(LogConstructionSubsystem, Log, TEXT("ActiveConstructionMode: BuildingClass invalid, fallback to default"));
-	// }
 		Mgr->SetIsActive(InCharacter, true);
 		return;
 	}
@@ -259,7 +240,7 @@ void UHB_ConstructionSubsystem::TickPreviewBuildingPos()
 		}
 		FVector PreviewLocation = PlayerCharacter->GetActorLocation() + FollowCamera->GetForwardVector() * 200;
 		FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(PreviewLocation);
-		BuildingMeshActor->SetActorLocation(FVector(GridWidth * GridIndex.X + GridWidth / 2, GridWidth * GridIndex.Y + GridWidth / 2, 0));
+        BuildingMeshActor->SetActorLocation(FVector(GRID_FRAGMENT_SIZE * GridIndex.X + GRID_FRAGMENT_SIZE * 0.5f, GRID_FRAGMENT_SIZE * GridIndex.Y + GRID_FRAGMENT_SIZE * 0.5f, 0));
 	}
 }
 

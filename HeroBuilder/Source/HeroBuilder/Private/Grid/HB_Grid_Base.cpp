@@ -66,7 +66,7 @@ void AHB_Grid_Base::OnConstruction(const FTransform& Transform)
 	{
 		for (int32 y = 0; y < GridLengthFragment; ++y)
 		{
-            InstanceTransforms.Emplace(FTransform(FVector(GridWidthFragment * 50, GridLengthFragment * 50, 0) - FVector(x * 100, y * 100, 0)));
+            InstanceTransforms.Emplace(FTransform(FVector(GridWidthFragment * (GRID_FRAGMENT_SIZE / 2), GridLengthFragment * (GRID_FRAGMENT_SIZE / 2), 0) - FVector(x * GRID_FRAGMENT_SIZE, y * GRID_FRAGMENT_SIZE, 0)));
 		}
 	}
 
@@ -82,5 +82,33 @@ void AHB_Grid_Base::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+}
+
+void AHB_Grid_Base::SetGridMaterial(UMaterialInterface* Material)
+{
+	if (!GridISMComponent)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[%s] SetGridMaterial 失败：GridISMComponent 为空"), *GetName());
+		return;
+	}
+	if (!Material)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[%s] SetGridMaterial 失败：传入的 Material 为空"), *GetName());
+		return;
+	}
+	if (!GridISMComponent->GetStaticMesh())
+	{
+		// 没有 StaticMesh 时 SetMaterial(0, ...) 不会有任何视觉效果
+		UE_LOG(LogTemp, Warning, TEXT("[%s] SetGridMaterial 无效：GridISMComponent 未设置 StaticMesh，请在蓝图子类中给 GridISMComponent 配置 StaticMesh"), *GetName());
+		return;
+	}
+
+	// 用 OverrideMaterials 覆盖 ISM 的所有材质槽，确保替换全部 Section
+	const int32 NumMaterials = GridISMComponent->GetNumMaterials();
+	for (int32 SlotIndex = 0; SlotIndex < NumMaterials; ++SlotIndex)
+	{
+		GridISMComponent->SetMaterial(SlotIndex, Material);
+	}
+	GridISMComponent->MarkRenderStateDirty();
 }
 

@@ -8,6 +8,8 @@
 #include "Resource/HB_Resource_Base.h"
 #include "GridData.generated.h"
 
+#define GRID_FRAGMENT_SIZE 100
+
 class AHB_Grid_Base;
 
 USTRUCT(BlueprintType)
@@ -24,6 +26,9 @@ public:
 	//资源配置
 	UPROPERTY(EditAnywhere,SimpleDisplay="资源配置")
     TMap<TSubclassOf<AHB_Resource_Base>,int32> ResourceConfigs;
+	//地块材质
+	UPROPERTY(EditAnywhere,SimpleDisplay="地块材质")
+    TObjectPtr<UMaterialInterface> GridMaterial;
 	////图腾配置
 	//UPROPERTY(EditAnywhere,SimpleDisplay="图腾配置")
 	//TArray<FAreaConfig> TotemConfigs;
@@ -37,13 +42,15 @@ class HEROBUILDER_API UGridData : public UDataAsset
 {
 	GENERATED_BODY()
 private:
+
 	// 单个Grid所占块数，每个块为100*100*20的正方形
     UPROPERTY(EditAnywhere,SimpleDisplay="网格宽度（100cm/块）")
 	int32 GridWidthFragment;
 	//长度
     UPROPERTY(EditAnywhere, SimpleDisplay = "网格长度（100cm/块）")
     int32 GridLengthFragment;
-	UPROPERTY(EditAnywhere,SimpleDisplay="网格大小")
+	//网格配置
+	UPROPERTY(EditAnywhere,SimpleDisplay="网格配置")
 	TMap<int32, FAreaConfig> AreaConfigs;
 
 public:

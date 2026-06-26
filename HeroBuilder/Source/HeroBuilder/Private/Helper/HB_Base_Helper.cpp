@@ -8,8 +8,10 @@ AHB_Base_Helper::AHB_Base_Helper()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	// Helper 引用通过 GameState 复制到客户端，本身需要被网络识别
-	bReplicates = true;
+	// Helper 内部没有需要网络同步的属性和逻辑，仅在服务端使用，
+	// 关闭复制以避免 "has no root component in AActor::IsNetRelevantFor" 警告并节省网络开销
+	bReplicates = false;
+	bNetLoadOnClient = false;
 }
 
 // Called when the game starts or when spawned

@@ -28,7 +28,6 @@ class HEROBUILDER_API UHB_ConstructionSubsystem : public UHB_WorldSubsystem_Base
 {
 	GENERATED_BODY()
 private:
-	float GridWidth=400;
 	UPROPERTY()
 	TObjectPtr<UConstructionData> ConstructionData;
 	void TickPreviewBuildingPos();

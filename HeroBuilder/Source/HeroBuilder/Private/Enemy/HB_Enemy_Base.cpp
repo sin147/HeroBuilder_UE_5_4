@@ -195,17 +195,17 @@ void AHB_Enemy_Base::Tick(float DeltaTime)
 		}
 		if (FVector::Distance(GetActorLocation(), Target->GetActorLocation()) > CombatRange)
 		{
-            //获取下一个路点
-            FVector NextPoint = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetNextNavigationPoint(this);
+   //         //获取下一个路点
+   //         FVector NextPoint = GetWorld()->GetSubsystem<UHB_GridSubsystem>()->GetNextNavigationPoint(this);
 
-			// 1. 计算角色到路点的世界方向
-            FVector Dir = (NextPoint - GetActorLocation()).GetSafeNormal();
+			//// 1. 计算角色到路点的世界方向
+   //         FVector Dir = (NextPoint - GetActorLocation()).GetSafeNormal();
 
-			// 2. 旋转角色朝向移动方向（AI标准转向）
-			SetControlRotation(Dir.Rotation());
+			////// 2. 旋转角色朝向移动方向（AI标准转向）
+			////SetControlRotation(Dir.Rotation());
 
-			// 3. 给Pawn叠加移动输入（真正驱动Movement的API）
-			Char->AddMovementInput(Dir, 1.0f);
+			////// 3. 给Pawn叠加移动输入（真正驱动Movement的API）
+			////Char->AddMovementInput(Dir, 1.0f);
 		}
 		else
 		{

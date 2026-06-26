@@ -249,7 +249,7 @@ void UHB_BuildingSubsystem::SpawnBuildingAtGrid(TSubclassOf<AHB_Building_Base> I
 	}
 
 	//Grid(X,Y) → 世界坐标（取格子中心，Z 默认 0，与现有 TickPreviewBuildingPos 一致）
-	const float GridWidth = static_cast<float>(GridSubsystem->GetGridWidthFragment());
+	const float GridWidth = static_cast<float>(GRID_FRAGMENT_SIZE);
 	const FVector SpawnLocation(
 		GridWidth * InX + GridWidth * 0.5f,
 		GridWidth * InY + GridWidth * 0.5f,

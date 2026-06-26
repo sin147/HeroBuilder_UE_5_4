@@ -62,47 +62,6 @@ void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			SpawnAreaByLevel(Level);
 		}
 
-		// =============== 动态生成导航网格 范围体并重建导航 ===============
-		// 计算 NavMesh 覆盖范围：以最大 Level 为依据，覆盖所有已生成的区域
-		const int32 MaxLevel = AllLevels.Num() > 0 ? AllLevels.Last() : 0;
-		const int32 GridWidthCm = GridData->GetGridWidthFragment() * 100;
-		const int32 GridLengthCm = GridData->GetGridLengthFragment() * 100;
-		// 单边 Grid 数量 = MaxLevel*2+1，总边长 = GridCount * GridWidth
-		const int32 GridCount = MaxLevel * 2 + 1;
-		// HalfExtent 加一些 padding（底部向下额外预留），以保证完全包含地形
-		const FVector NavBoundsExtent(
-			GridCount * GridWidthCm * 0.5f + 200.0f,
-			GridCount * GridLengthCm * 0.5f + 200.0f,
-			1000.0f);
-
-		// 1. 动态生成 NavMeshBoundsVolume（以世界原点为中心）
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		ANavMeshBoundsVolume* NewNavBounds = GetWorld()->SpawnActor<ANavMeshBoundsVolume>(
-			ANavMeshBoundsVolume::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-
-		if (NewNavBounds && NewNavBounds->GetBrushComponent())
-		{
-			// NavMeshBoundsVolume 默认 Brush 是 200x200x200 的立方体，通过缩放达到目标范围
-			// (默认 HalfExtent = 100，所以 Scale = TargetExtent / 100)
-			NewNavBounds->SetActorScale3D(NavBoundsExtent / 100.0f);
-
-			// 2. 通知导航系统更新该 Volume
-			if (UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld()))
-			{
-				NavSys->OnNavigationBoundsUpdated(NewNavBounds);
-				// 针对导航网格范围 Bounds 重建导航（局部重建，性能较优）
-				NavSys->Build();
-			}
-			UE_LOG(LogGridSubsystem, Log, TEXT("OnWorldBeginPlay: Spawned NavMeshBoundsVolume Extent=%s"),
-				*NavBoundsExtent.ToString());
-		}
-		else
-		{
-			UE_LOG(LogGridSubsystem, Error, TEXT("OnWorldBeginPlay: Failed to spawn NavMeshBoundsVolume"));
-		}
-
-		UE_LOG(LogGridSubsystem, Log, TEXT("OnWorldBeginPlay: Spawned %d areas"), AllLevels.Num());
 	}
 	else
 	{
@@ -179,17 +138,24 @@ FVector2D UHB_GridSubsystem::CalulateGridIndexByLocation(const FVector& Location
 		UE_LOG(LogGridSubsystem, Error, TEXT("CalulateGridIndexByLocation: GridData is null"));
 		return FVector2D::ZeroVector;
 	}
-	const int32 Width = GridData->GetGridWidthFragment();
+	const int32 Width = GRID_FRAGMENT_SIZE;
+    const int32 Length = GRID_FRAGMENT_SIZE;
 	if (Width == 0)
 	{
 		UE_LOG(LogGridSubsystem, Error, TEXT("CalulateGridIndexByLocation: GridWidthFragment is 0, cannot divide"));
 		return FVector2D::ZeroVector;
 	}
+	if (Length == 0)
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("CalulateGridIndexByLocation: GridLengthFragment is 0, cannot divide"));
+		return FVector2D::ZeroVector;
+	}
 	int X = FMath::Floor(Location.X / Width);
-	int Y = FMath::Floor(Location.Y / Width);
+	int Y = FMath::Floor(Location.Y / Length);
 
 	return FVector2D(X,Y);
 }
+
 void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
 {
 	FAreaConfig AreaConfig;
@@ -199,8 +165,11 @@ void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
 		return;
 	}
     //单个Grid的宽度
-    int32 GridWidth = GridData->GetGridWidthFragment()*100;
-	int32 GridLength = GridData->GetGridLengthFragment()*100;
+    int32 GridWidth = GridData->GetGridWidthFragment() * GRID_FRAGMENT_SIZE;
+	int32 GridLength = GridData->GetGridLengthFragment() * GRID_FRAGMENT_SIZE;
+	int32 AreaHeight = -GRID_FRAGMENT_SIZE;
+	//材质
+    UMaterialInterface* Material = AreaConfig.GridMaterial;
 
     //获取Grid类
     TSubclassOf<AHB_Grid_Base> GridClass = GridData->GetGridClassByLevel(Level);
@@ -208,7 +177,8 @@ void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
 	//Level == 0 时只在中心生成一个Grid，避免上下边重叠
 	if (Level == 0)
 	{
-		SpawnGrid(GridClass, FVector::ZeroVector, FRotator::ZeroRotator);
+        AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(0, 0, AreaHeight), FRotator::ZeroRotator);
+		NewGrid->SetGridMaterial(Material);
 		return;
 	}
 
@@ -223,29 +193,44 @@ void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
 	//右下角位置
 	FVector2D RightDownPos = FVector2D(GridWidth * Level, -GridLength * Level);
 
-	//根据等级生成区域
-    //生成X方向的区域（上下两条横边）
-    for(int32 i=0; i<GridCount; i++)
-    {
-		//生成上边的区域
-        SpawnGrid(GridClass, FVector(LeftUpPos.X + i * GridWidth, LeftUpPos.Y, 0), FRotator::ZeroRotator);
-        //生成下边的区域
-        SpawnGrid(GridClass, FVector(LeftDownPos.X + i * GridWidth, LeftDownPos.Y, 0), FRotator::ZeroRotator);
-	}
-	//生成Y方向的区域（左右两条竖边，去掉四个角避免和横边重复）
-    for(int32 i=1; i<GridCount-1; i++)
+	//根据等级生成区域：分别生成 上、下、左、右 四条边
+
+	//生成上边的区域（从左上到右上，整行 GridCount 个）
+	for (int32 i = 0; i < GridCount; i++)
 	{
-		//生成左边的区域
-		SpawnGrid(GridClass,FVector(LeftDownPos.X, LeftDownPos.Y + i * GridLength, 0), FRotator::ZeroRotator);
-		//生成右边的区域
-        SpawnGrid(GridClass,FVector(RightDownPos.X, RightDownPos.Y + i * GridLength, 0), FRotator::ZeroRotator);
+        AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(LeftUpPos.X + i * GridWidth, LeftUpPos.Y, AreaHeight), FRotator::ZeroRotator);
+		NewGrid->SetGridMaterial(Material);
+	}
+
+	//生成下边的区域（从左下到右下，整行 GridCount 个）
+	for (int32 i = 0; i < GridCount; i++)
+	{
+        AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(LeftDownPos.X + i * GridWidth, LeftDownPos.Y, AreaHeight), FRotator::ZeroRotator);
+		NewGrid->SetGridMaterial(Material);
+	}
+
+	//生成左边的区域（从左下到左上，去掉两端的角，避免和上下边重复）
+	for (int32 i = 1; i < GridCount - 1; i++)
+	{
+        AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(LeftDownPos.X, LeftDownPos.Y + i * GridLength, AreaHeight), FRotator::ZeroRotator);
+		NewGrid->SetGridMaterial(Material);
+	}
+
+	//生成右边的区域（从右下到右上，去掉两端的角，避免和上下边重复）
+	for (int32 i = 1; i < GridCount - 1; i++)
+	{
+        AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(RightDownPos.X, RightDownPos.Y + i * GridLength, AreaHeight), FRotator::ZeroRotator);
+		NewGrid->SetGridMaterial(Material);
 	}
 
 }
+
 AHB_Grid_Base* UHB_GridSubsystem::SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation)
 {
-    return GetWorld()->SpawnActor<AHB_Grid_Base>(GridClass, Location, Rotation);
+	AHB_Grid_Base* NewGrid = GetWorld()->SpawnActor<AHB_Grid_Base>(GridClass, Location, Rotation);
+    return NewGrid;
 }
+
 FVector UHB_GridSubsystem::GetNextNavigationPoint(FVector CurrentLocation, FVector TargetLocation)
 {
 	// 计算朝向（仅在 XY 平面内，忽略 Z 轴差异，避免高度差导致斜率计算异常）
@@ -253,8 +238,8 @@ FVector UHB_GridSubsystem::GetNextNavigationPoint(FVector CurrentLocation, FVect
 	Delta.Z = 0.0f;
 	const FVector Direction = Delta.GetSafeNormal();
 	//预测步长
-	float StepX = Direction.X * 100;
-	float StepY = Direction.Y * 100;
+	float StepX = Direction.X * GRID_FRAGMENT_SIZE;
+	float StepY = Direction.Y * GRID_FRAGMENT_SIZE;
 	//计算下一个点
 	float NextX = CurrentLocation.X + StepX;
 	float NextY = CurrentLocation.Y + StepY;
@@ -262,6 +247,7 @@ FVector UHB_GridSubsystem::GetNextNavigationPoint(FVector CurrentLocation, FVect
     const FVector NextPoint = FVector(NextX, NextY, CurrentLocation.Z);
 	return NextPoint;
 }
+
 void UHB_GridSubsystem::OnSpawnBuilding(AHB_Building_Base* NewBuilding, FTransform SpawnTransform)
 {
 	FVector2D GridIndex = CalulateGridIndexByLocation(SpawnTransform.GetLocation());

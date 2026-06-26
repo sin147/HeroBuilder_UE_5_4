@@ -18,7 +18,7 @@ void AHeroBuilderGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHeroBuilderGameState, ReplicatedManagers);
-	DOREPLIFETIME(AHeroBuilderGameState, ReplicatedHelpers);
+	// LocalHelpers 不参与网络复制（Helper 仅服务端使用）
 }
 
 void AHeroBuilderGameState::SpawnAllManagersAndHelpers()
@@ -86,7 +86,7 @@ void AHeroBuilderGameState::RegisterHelper(AHB_Base_Helper* Helper)
 	{
 		return;
 	}
-	ReplicatedHelpers.AddUnique(Helper);
+	LocalHelpers.AddUnique(Helper);
 }
 
 void AHeroBuilderGameState::ClearManagers()
@@ -104,5 +104,5 @@ void AHeroBuilderGameState::ClearHelpers()
 	{
 		return;
 	}
-	ReplicatedHelpers.Reset();
+	LocalHelpers.Reset();
 }
