@@ -121,7 +121,7 @@ enum ETargetType : int8
 
 //波次状态
 UENUM(BlueprintType)
-enum EWaveState :int8
+enum ETotemState :int8
 {
 	WS_Preparatory UMETA(DisplayName = "准备阶段"),
 	WS_Fight UMETA(DisplayName = "战斗阶段"),

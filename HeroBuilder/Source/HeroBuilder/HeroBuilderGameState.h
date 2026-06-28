@@ -79,7 +79,7 @@ public:
 
 	const TArray<TObjectPtr<AHB_Base_Manager>>& GetAllManagers() const { return ReplicatedManagers; }
 	const TArray<TObjectPtr<AHB_Base_Helper>>& GetAllHelpers() const { return LocalHelpers; }
-
+	virtual void HandleBeginPlay() override;
 private:
 	UPROPERTY(Replicated)
 	TArray<TObjectPtr<AHB_Base_Manager>> ReplicatedManagers;

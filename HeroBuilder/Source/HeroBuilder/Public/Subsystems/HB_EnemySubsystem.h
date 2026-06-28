@@ -44,7 +44,7 @@ public:
 public:
 	/*************************************外部接口*****************************************/
 	//生成敌人
-	void SpawnEnemy(TSubclassOf<AHB_Enemy_Base> InClass, const FTransform& InTransform);
+	void Spawn(TSubclassOf<AHB_Enemy_Base> InClass, const FTransform& InTransform);
 	//销毁敌人
 	void DestroyEnemy(AHB_Enemy_Base* InEnemy);
 	//寻找目标

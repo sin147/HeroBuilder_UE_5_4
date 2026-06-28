@@ -4,6 +4,9 @@
 #include "Manager/HB_Base_Manager.h"
 #include "Helper/HB_Base_Helper.h"
 #include "Net/UnrealNetwork.h"
+#include "Subsystems/HB_GridSubsystem.h"
+#include "Subsystems/HB_EnemySubsystem.h"
+#include "Subsystems/HB_ResourceSubsystem.h"
 #include "UObject/UObjectIterator.h"
 #include "Engine/World.h"
 
@@ -105,4 +108,16 @@ void AHeroBuilderGameState::ClearHelpers()
 		return;
 	}
 	LocalHelpers.Reset();
+}
+
+void AHeroBuilderGameState::HandleBeginPlay()
+{
+	Super::HandleBeginPlay();
+	//生成地形
+
+	//生成图腾
+
+	//生成Boss
+
+	//生成资源
 }

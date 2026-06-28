@@ -152,7 +152,7 @@ void UHB_EnemySubsystem::TickSpawnEnemy()
 	}
 }
 
-void UHB_EnemySubsystem::SpawnEnemy(TSubclassOf<AHB_Enemy_Base> InClass, const FTransform& InTransform)
+void UHB_EnemySubsystem::Spawn(TSubclassOf<AHB_Enemy_Base> InClass, const FTransform& InTransform)
 {
 	if (InClass)
 	{
