@@ -30,10 +30,11 @@ public:
 	 * 服务端/客户端通用：通过 GameState 获取已复制的 Manager。
 	 * Manager 的存储已统一迁移到 GameState（ReplicatedManagers）。
 	 */
+
 	template <typename T>
-	T* GetManager()
+	T* GetManager() const
 	{
-		UWorld* World = this->GetWorld();
+		UWorld* World = const_cast<UHB_WorldSubsystem_Base*>(this)->GetWorld();
 		if (!World)
 		{
 			return nullptr;
@@ -50,10 +51,11 @@ public:
 	 * Helper 内部不需要网络同步，仅在服务端使用；
 	 * 客户端调用会拿到 nullptr（GameState 上的 Helper 列表不参与复制）。
 	 */
+
 	template <typename T>
-	T* GetHelper()
+	T* GetHelper() const
 	{
-		UWorld* World = this->GetWorld();
+		UWorld* World = const_cast<UHB_WorldSubsystem_Base*>(this)->GetWorld();
 		if (!World)
 		{
 			return nullptr;
