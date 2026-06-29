@@ -172,8 +172,22 @@ void UHB_BuildingSubsystem::SpawnBuilding(TSubclassOf<AHB_Building_Base> InClass
 		return;
 	}
 
+	//目标 Fragment 互斥校验：已被资源/建筑/图腾/敌人占用则不可建造
+	UHB_GridSubsystem* GridSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UHB_GridSubsystem>() : nullptr;
+	if (GridSubsystem)
+	{
+		const FVector2D GridIndex = GridSubsystem->CalulateGridIndexByLocation(InTransform.GetLocation());
+		if (GridSubsystem->IsGridUsed(static_cast<int32>(GridIndex.X), static_cast<int32>(GridIndex.Y)))
+		{
+			UE_LOG(LogBuildingSystem, Warning, TEXT("SpawnBuilding aborted: target grid (%d,%d) is already occupied"),
+				static_cast<int32>(GridIndex.X), static_cast<int32>(GridIndex.Y));
+			return;
+		}
+	}
+
 	UE_LOG(LogBuildingSystem, Log, TEXT("Spawning building - Class: %s, Location: %s"),
 		*InClass->GetName(), *InTransform.GetLocation().ToString());
+
 
 	//校验通过后执行实际扣除（必须在真正生成 Actor 之前完成，避免失败时残留脏数据）
 	//说明：

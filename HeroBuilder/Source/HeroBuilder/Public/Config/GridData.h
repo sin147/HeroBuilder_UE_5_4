@@ -6,6 +6,7 @@
 #include "Engine/DataAsset.h"
 #include "Enemy/HB_Enemy_Base.h"
 #include "Resource/HB_Resource_Base.h"
+#include "Totem/HB_Totem_Base.h"
 #include "GridData.generated.h"
 
 #define GRID_FRAGMENT_SIZE 100
@@ -22,16 +23,16 @@ public:
 	TSubclassOf<AHB_Grid_Base> GridClass;
     //敌人配置
 	UPROPERTY(EditAnywhere,SimpleDisplay="怪物配置")
-    TMap<TSubclassOf<AHB_Enemy_Base>,int32> MonsterConfigs;
+    TMap<TSubclassOf<AHB_Enemy_Base>,int32> EnemyConfigs;
 	//资源配置
 	UPROPERTY(EditAnywhere,SimpleDisplay="资源配置")
     TMap<TSubclassOf<AHB_Resource_Base>,int32> ResourceConfigs;
 	//地块材质
 	UPROPERTY(EditAnywhere,SimpleDisplay="地块材质")
     TObjectPtr<UMaterialInterface> GridMaterial;
-	////图腾配置
-	//UPROPERTY(EditAnywhere,SimpleDisplay="图腾配置")
-	//TArray<FAreaConfig> TotemConfigs;
+	//图腾配置
+	UPROPERTY(EditAnywhere,SimpleDisplay="图腾配置")
+	TMap<TSubclassOf<AHB_Totem_Base>,int32> TotemConfigs;
 };
 
 /**

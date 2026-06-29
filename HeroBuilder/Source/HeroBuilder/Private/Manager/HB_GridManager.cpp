@@ -17,6 +17,15 @@ void AHB_GridManager::RemoveUsedGridInfo(int InX, int InY)
 	FreeGridInfos.AddUnique(FGridInfo(InX, InY));										
 }
 
+void AHB_GridManager::RegisterFreeGridInfo(int InX, int InY)
+{
+	FGridInfo Info(InX, InY);
+	if (!UsedGridInfos.Contains(Info))
+	{
+		FreeGridInfos.AddUnique(Info);
+	}
+}
+
 TArray<FGridInfo> AHB_GridManager::GetUsedGridInfo()
 {
     return UsedGridInfos;
@@ -30,5 +39,4 @@ void AHB_GridManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHB_GridManager, UsedGridInfos);
-	DOREPLIFETIME(AHB_GridManager, FreeGridInfos);
 }

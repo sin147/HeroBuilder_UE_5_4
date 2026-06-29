@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Subsystems/HB_TotemSubsystem.h"
 #include "Enemy/HB_Enemy_Base.h"
@@ -70,7 +70,14 @@ AHB_Totem_Base* UHB_TotemSubsystem::SpawnTotem(TSubclassOf<AHB_Totem_Base> InTot
 	}
 
 	// 2. 生成图腾 Actor
-	AHB_Totem_Base* NewTotem = World->SpawnActor<AHB_Totem_Base>(InTotemClass, SpawnTransform);
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	AHB_Totem_Base* NewTotem = World->SpawnActor<AHB_Totem_Base>(
+		InTotemClass,
+		SpawnTransform,
+		SpawnParams
+	);
 	if (!IsValid(NewTotem))
 	{
 		UE_LOG(LogTotemSubsystem, Error, TEXT("Failed to spawn totem: %s"), *InTotemClass->GetName());
@@ -90,6 +97,9 @@ AHB_Totem_Base* UHB_TotemSubsystem::SpawnTotem(TSubclassOf<AHB_Totem_Base> InTot
 	NewTotem->OnAllWavesComplete.AddDynamic(this, &UHB_TotemSubsystem::OnTotemAllWavesComplete);
 
 	UE_LOG(LogTotemSubsystem, Log, TEXT("Spawned totem %s at %s"), *NewTotem->GetName(), *SpawnTransform.GetLocation().ToString());
+
+	OnSpawnTotem.Broadcast(NewTotem, SpawnTransform);
+
 	return NewTotem;
 }
 

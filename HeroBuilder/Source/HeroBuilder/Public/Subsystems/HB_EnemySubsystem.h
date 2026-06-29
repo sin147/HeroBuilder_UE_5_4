@@ -10,6 +10,9 @@
 class AHB_Enemy_Base;
 DECLARE_LOG_CATEGORY_EXTERN(LogEnemySubsystem, Log, All);
 
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnSpawnEnemy, AHB_Enemy_Base* /*InEnemy*/, FTransform /*InTransform*/);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnDestroyEnemy, AHB_Enemy_Base* /*InEnemy*/, FTransform /*InTransform*/);
+
 
 
 
@@ -62,6 +65,10 @@ public:
 	// 新建筑生成通知回调
 	UFUNCTION()
 	void OnSpawnBuilding(AHB_Building_Base* NewBuilding,FTransform SpawnTransform);
+
+	/** 敌人生成/销毁事件（供 GridSubsystem 等监听以同步占位） */
+	FOnSpawnEnemy OnSpawnEnemy;
+	FOnDestroyEnemy OnDestroyEnemy;
 public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { return TStatId(); }

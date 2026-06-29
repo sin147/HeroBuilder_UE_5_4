@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -11,6 +11,8 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogGridSubsystem, Log, All);
 class AHB_Building_Base;
 class AHB_Resource_Base;
+class AHB_Totem_Base;
+class AHB_Enemy_Base;
 class AHB_Grid_Base;
 
 /**
@@ -24,14 +26,27 @@ private:
 	UPROPERTY()
 	TObjectPtr<UGridData> GridData;
     TObjectPtr<AHB_GridManager> GridManager;
+
+	/** 全局 Grid 中心坐标 -> GridActor 的查找表 */
+	TMap<FGridInfo, TWeakObjectPtr<AHB_Grid_Base>> GridActorMap;
+
 	void OnSpawnBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);
 	void OnDestroyBuilding(AHB_Building_Base* InBuilding, FTransform InTransform);
 	void OnSpawnResource(AHB_Resource_Base* InResource, FTransform InTransform);
 	void OnDestroyResource(AHB_Resource_Base* InResource, FTransform InTransform);
+	void OnSpawnTotem(AHB_Totem_Base* InTotem, FTransform InTransform);
+	void OnSpawnEnemy(AHB_Enemy_Base* InEnemy, FTransform InTransform);
+	void OnDestroyEnemy(AHB_Enemy_Base* InEnemy, FTransform InTransform);
+
+	/** 根据世界位置找到对应的 GridActor */
+	AHB_Grid_Base* FindGridActorByFragmentCoord(int32 InX, int32 InY) const;
 public:
+	/** 获取当前加载的 GridData 配置数据 */
+	UGridData* GetGridData() const { return GridData; }
+
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
-    int32 GetGridWidthFragment() const;	
+    int32 GetGridWidthFragment() const;
 	int32 GetGridLengthFragment() const;
 	TArray<FGridInfo> GetUsedGridIndexs();
 	TArray<FGridInfo> GetFreeGridIndexs();
@@ -45,6 +60,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SpawnAreaByLevel(int32 Level);
     AHB_Grid_Base* SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation);
+
+	/** GridActor 构造完成后注册到本 Subsystem，将其 Fragment 纳入全局管理 */
+	void RegisterGridActor(AHB_Grid_Base* InGridActor);
 
 	FVector GetNextNavigationPoint(FVector CurrentLocation, FVector TargetLocation);
 };

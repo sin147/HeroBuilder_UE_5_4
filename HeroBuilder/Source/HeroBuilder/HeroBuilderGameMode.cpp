@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "HeroBuilderGameMode.h"
 #include "HeroBuilderCharacter.h"
@@ -23,14 +23,4 @@ AHeroBuilderGameMode::AHeroBuilderGameMode()
 void AHeroBuilderGameMode::StartPlay()
 {
 	Super::StartPlay();
-
-	// Manager / Helper 的扫描与 Spawn 已统一移交给 GameState 完成
-	if (AHeroBuilderGameState* HBGS = GetGameState<AHeroBuilderGameState>())
-	{
-		HBGS->SpawnAllManagersAndHelpers();
-	}
-	else
-	{
-		UE_LOG(LogHeroBuilderGameMode, Error, TEXT("StartPlay: HeroBuilderGameState is null, fail to spawn managers/helpers"));
-	}
 }

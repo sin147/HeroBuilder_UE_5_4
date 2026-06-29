@@ -119,7 +119,10 @@ void UHB_EnemySubsystem::TickSpawnEnemy()
 				
 				//生成敌人（一步式 Spawn：BeginPlay 在 SpawnActor 内部就已执行完毕）
 				//注意：因此 InitialEnemy 会在 BeginPlay 之后才调用，依赖配置参数的初始化要在 InitialEnemy 内部自行处理。
-				TObjectPtr<AHB_Enemy_Base> NewEnemy = GetWorld()->SpawnActor<AHB_Enemy_Base>(OutItem.Key, OutItem.Value);
+				FActorSpawnParameters SpawnParams;
+				SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+				TObjectPtr<AHB_Enemy_Base> NewEnemy = GetWorld()->SpawnActor<AHB_Enemy_Base>(OutItem.Key, OutItem.Value, SpawnParams);
 				if (IsValid(NewEnemy))
 				{
 					//初始化敌人数据
@@ -134,8 +137,10 @@ void UHB_EnemySubsystem::TickSpawnEnemy()
 						NewEnemy->InitialEnemy(DefaultConfig);
 					}
 
-					UE_LOG(LogEnemySubsystem, Log, TEXT("Successfully spawned enemy: %s"), *NewEnemy->GetName());
-					GetManager<AHB_EnemyManager>()->AddEnemy(NewEnemy);
+				UE_LOG(LogEnemySubsystem, Log, TEXT("Successfully spawned enemy: %s"), *NewEnemy->GetName());
+				GetManager<AHB_EnemyManager>()->AddEnemy(NewEnemy);
+
+				OnSpawnEnemy.Broadcast(NewEnemy, OutItem.Value);
 				}
 				else
 				{
@@ -172,11 +177,17 @@ void UHB_EnemySubsystem::DestroyEnemy(AHB_Enemy_Base* InEnemy)
 	{
 		return;
 	}
+
+	const FTransform DestroyTransform = InEnemy->GetActorTransform();
+
 	AHB_EnemyManager* EnemyManager = GetManager<AHB_EnemyManager>();
 	if (EnemyManager)
 	{
 		EnemyManager->RemoveEnemy(InEnemy);
 	}
+
+	OnDestroyEnemy.Broadcast(InEnemy, DestroyTransform);
+
 	InEnemy->Destroy();
 }
 

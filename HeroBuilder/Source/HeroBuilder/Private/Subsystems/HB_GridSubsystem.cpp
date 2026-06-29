@@ -1,11 +1,15 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Subsystems/HB_GridSubsystem.h"
 #include "Subsystems/HB_BuildingSubsystem.h"
 #include "Subsystems/HB_ResourceSubsystem.h"
+#include "Subsystems/HB_TotemSubsystem.h"
+#include "Subsystems/HB_EnemySubsystem.h"
 #include "Grid/HB_Grid_Base.h"
 #include "Manager/HB_GridManager.h"
+#include "Totem/HB_Totem_Base.h"
+#include "Enemy/HB_Enemy_Base.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "NavigationSystem.h"
 #include "Components/BrushComponent.h"
@@ -31,7 +35,11 @@ void UHB_GridSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
-	GridManager = GetWorld()->SpawnActor<AHB_GridManager>();
+	if (NetMode == NM_Client)
+	{
+		return;
+	}
+
 	// 订阅新建筑生成通知
 	if (UHB_BuildingSubsystem* Building=GetWorld()->GetSubsystem<UHB_BuildingSubsystem>())
 	{
@@ -39,7 +47,7 @@ void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	else
 	{
-		UE_LOG(LogGridSubsystem, Error, TEXT("Failed to get BuildingManager"));
+		UE_LOG(LogGridSubsystem, Error, TEXT("Failed to get BuildingSubsystem"));
 	}
 
 	// 订阅资源生成/销毁通知
@@ -53,20 +61,28 @@ void UHB_GridSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		UE_LOG(LogGridSubsystem, Error, TEXT("Failed to get ResourceSubsystem"));
 	}
 
-	// 根据 GridData 中配置的 Area Level 列表，依次从中心向外生成区域
-	if (IsValid(GridData))
+	// 订阅图腾生成通知
+	if (UHB_TotemSubsystem* Totem = GetWorld()->GetSubsystem<UHB_TotemSubsystem>())
 	{
-		const TArray<int32> AllLevels = GridData->GetAllAreaLevels();
-		for (int32 Level : AllLevels)
-		{
-			SpawnAreaByLevel(Level);
-		}
-
+		Totem->OnSpawnTotem.AddUObject(this, &UHB_GridSubsystem::OnSpawnTotem);
 	}
 	else
 	{
-		UE_LOG(LogGridSubsystem, Error, TEXT("OnWorldBeginPlay: GridData is null, skip spawning areas"));
+		UE_LOG(LogGridSubsystem, Error, TEXT("Failed to get TotemSubsystem"));
 	}
+
+	// 订阅敌人生成/销毁通知
+	if (UHB_EnemySubsystem* Enemy = GetWorld()->GetSubsystem<UHB_EnemySubsystem>())
+	{
+		Enemy->OnSpawnEnemy.AddUObject(this, &UHB_GridSubsystem::OnSpawnEnemy);
+		Enemy->OnDestroyEnemy.AddUObject(this, &UHB_GridSubsystem::OnDestroyEnemy);
+	}
+	else
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("Failed to get EnemySubsystem"));
+	}
+
+
 }
 int32 UHB_GridSubsystem::GetGridWidthFragment() const
 {
@@ -168,8 +184,7 @@ void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
     int32 GridWidth = GridData->GetGridWidthFragment() * GRID_FRAGMENT_SIZE;
 	int32 GridLength = GridData->GetGridLengthFragment() * GRID_FRAGMENT_SIZE;
 	int32 AreaHeight = -GRID_FRAGMENT_SIZE;
-	//材质
-    UMaterialInterface* Material = AreaConfig.GridMaterial;
+
 
     //获取Grid类
     TSubclassOf<AHB_Grid_Base> GridClass = GridData->GetGridClassByLevel(Level);
@@ -178,7 +193,7 @@ void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
 	if (Level == 0)
 	{
         AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(0, 0, AreaHeight), FRotator::ZeroRotator);
-		NewGrid->SetGridMaterial(Material);
+		NewGrid->SetAreaLevel(Level);
 		return;
 	}
 
@@ -194,41 +209,209 @@ void UHB_GridSubsystem::SpawnAreaByLevel(int32 Level)
 	FVector2D RightDownPos = FVector2D(GridWidth * Level, -GridLength * Level);
 
 	//根据等级生成区域：分别生成 上、下、左、右 四条边
-
+	TArray<AHB_Grid_Base*> CurrentlyLevelGrids;
 	//生成上边的区域（从左上到右上，整行 GridCount 个）
 	for (int32 i = 0; i < GridCount; i++)
 	{
         AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(LeftUpPos.X + i * GridWidth, LeftUpPos.Y, AreaHeight), FRotator::ZeroRotator);
-		NewGrid->SetGridMaterial(Material);
+		NewGrid->SetAreaLevel(Level);
+		CurrentlyLevelGrids.Add(NewGrid);
 	}
 
 	//生成下边的区域（从左下到右下，整行 GridCount 个）
 	for (int32 i = 0; i < GridCount; i++)
 	{
         AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(LeftDownPos.X + i * GridWidth, LeftDownPos.Y, AreaHeight), FRotator::ZeroRotator);
-		NewGrid->SetGridMaterial(Material);
+		NewGrid->SetAreaLevel(Level);
+		CurrentlyLevelGrids.Add(NewGrid);
 	}
 
 	//生成左边的区域（从左下到左上，去掉两端的角，避免和上下边重复）
 	for (int32 i = 1; i < GridCount - 1; i++)
 	{
         AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(LeftDownPos.X, LeftDownPos.Y + i * GridLength, AreaHeight), FRotator::ZeroRotator);
-		NewGrid->SetGridMaterial(Material);
+		NewGrid->SetAreaLevel(Level);
+		CurrentlyLevelGrids.Add(NewGrid);
 	}
 
 	//生成右边的区域（从右下到右上，去掉两端的角，避免和上下边重复）
 	for (int32 i = 1; i < GridCount - 1; i++)
 	{
         AHB_Grid_Base* NewGrid = SpawnGrid(GridClass, FVector(RightDownPos.X, RightDownPos.Y + i * GridLength, AreaHeight), FRotator::ZeroRotator);
-		NewGrid->SetGridMaterial(Material);
+		NewGrid->SetAreaLevel(Level);
+		CurrentlyLevelGrids.Add(NewGrid);
+	}
+	//生成资源
+	const TMap<TSubclassOf<AHB_Resource_Base>, int32>& ResourceConfigs = AreaConfig.ResourceConfigs;
+	UHB_ResourceSubsystem* ResourceSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UHB_ResourceSubsystem>() : nullptr;
+	if (!ResourceSubsystem)
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("SpawnAreaByLevel: Failed to get ResourceSubsystem"));
+	}
+	else
+	{
+		for (const auto& ResourceConfig : ResourceConfigs)
+		{
+			const int32 ResourceCount = ResourceConfig.Value;
+			const TSubclassOf<AHB_Resource_Base>& ResourceClass = ResourceConfig.Key;
+			for (int32 i = 0; i < ResourceCount; ++i)
+			{
+				FVector ResourceSpawnPosition;
+				bool bSpawned = false;
+
+				// 在当前区域 Grid 中随机尝试，避免某个 Grid 已满时一直命中它
+				for (int32 Try = 0; Try < CurrentlyLevelGrids.Num(); ++Try)
+				{
+					AHB_Grid_Base* RandomGrid = CurrentlyLevelGrids[FMath::RandRange(0, CurrentlyLevelGrids.Num() - 1)];
+					if (RandomGrid && RandomGrid->GetRandomPosition(ResourceSpawnPosition))
+					{
+						ResourceSubsystem->SpawnResource(ResourceClass, FTransform(FRotator::ZeroRotator, ResourceSpawnPosition+FVector(0,0,100), FVector(1, 1, 1)));
+						bSpawned = true;
+						break;
+					}
+
+				}
+
+				if (!bSpawned)
+				{
+					UE_LOG(LogGridSubsystem, Warning, TEXT("SpawnAreaByLevel Level=%d: 当前区域没有足够空闲 Fragment 生成资源 %s，已生成 %d/%d"),
+						Level, *ResourceClass->GetName(), i, ResourceCount);
+					break;
+				}
+			}
+		}
 	}
 
+	//生成图腾
+	UHB_TotemSubsystem* TotemSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UHB_TotemSubsystem>() : nullptr;
+	if (!TotemSubsystem)
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("SpawnAreaByLevel: Failed to get TotemSubsystem"));
+	}
+	else
+	{
+		const TMap<TSubclassOf<AHB_Totem_Base>, int32>& TotemConfigs = AreaConfig.TotemConfigs;
+		for (const auto& TotemConfig : TotemConfigs)
+		{
+			const int32 TotemCount = TotemConfig.Value;
+			const TSubclassOf<AHB_Totem_Base>& TotemClass = TotemConfig.Key;
+			for (int32 i = 0; i < TotemCount; ++i)
+			{
+				FVector TotemSpawnPosition;
+				bool bSpawned = false;
+
+				// 在当前区域 Grid 中随机尝试，避免某个 Grid 已满时一直命中它
+				for (int32 Try = 0; Try < CurrentlyLevelGrids.Num(); ++Try)
+				{
+					AHB_Grid_Base* RandomGrid = CurrentlyLevelGrids[FMath::RandRange(0, CurrentlyLevelGrids.Num() - 1)];
+					if (RandomGrid && RandomGrid->GetRandomPosition(TotemSpawnPosition))
+					{
+						TotemSubsystem->SpawnTotem(TotemClass, FTransform(FRotator::ZeroRotator, TotemSpawnPosition+FVector(0,0,200), FVector(1, 1, 1)));
+						bSpawned = true;
+						break;
+					}
+				}
+
+				if (!bSpawned)
+				{
+					UE_LOG(LogGridSubsystem, Warning, TEXT("SpawnAreaByLevel Level=%d: 当前区域没有足够空闲位置生成图腾 %s，已生成 %d/%d"),
+						Level, *TotemClass->GetName(), i, TotemCount);
+					break;
+				}
+			}
+		}
+	}
+	//生成敌人
+	UHB_EnemySubsystem* EnemySubsystem = GetWorld() ? GetWorld()->GetSubsystem<UHB_EnemySubsystem>() : nullptr;
+	if (!EnemySubsystem)
+	{
+		UE_LOG(LogGridSubsystem, Error, TEXT("SpawnAreaByLevel: Failed to get EnemySubsystem"));
+	}
+	else
+	{
+		const TMap<TSubclassOf<AHB_Enemy_Base>, int32>& EnemyConfigs = AreaConfig.EnemyConfigs;
+		for (const auto& EnemyConfig : EnemyConfigs)
+		{
+			const int32 EnemyCount = EnemyConfig.Value;
+			const TSubclassOf<AHB_Enemy_Base>& EnemyClass = EnemyConfig.Key;
+			for (int32 i = 0; i < EnemyCount; ++i)
+			{
+				FVector EnemySpawnPosition;
+				bool bSpawned = false;
+
+				// 在当前区域 Grid 中随机尝试，避免某个 Grid 已满时一直命中它
+				for (int32 Try = 0; Try < CurrentlyLevelGrids.Num(); ++Try)
+				{
+					AHB_Grid_Base* RandomGrid = CurrentlyLevelGrids[FMath::RandRange(0, CurrentlyLevelGrids.Num() - 1)];
+					if (RandomGrid && RandomGrid->GetRandomPosition(EnemySpawnPosition))
+					{
+						EnemySubsystem->Spawn(EnemyClass, FTransform(FRotator::ZeroRotator, EnemySpawnPosition+FVector(0,0,200), FVector(1, 1, 1)));
+						bSpawned = true;
+						break;
+					}
+				}
+
+				if (!bSpawned)
+				{
+					UE_LOG(LogGridSubsystem, Warning, TEXT("SpawnAreaByLevel Level=%d: 当前区域没有足够空闲位置生成敌人 %s，已生成 %d/%d"),
+						Level, *EnemyClass->GetName(), i, EnemyCount);
+					break;
+				}
+			}
+		}
+	}
 }
+
 
 AHB_Grid_Base* UHB_GridSubsystem::SpawnGrid(TSubclassOf<AHB_Grid_Base> GridClass, FVector Location, FRotator Rotation)
 {
 	AHB_Grid_Base* NewGrid = GetWorld()->SpawnActor<AHB_Grid_Base>(GridClass, Location, Rotation);
+	// GridActor 会在 OnConstruction 中调用 RegisterGridActor，这里无需重复注册
     return NewGrid;
+}
+
+void UHB_GridSubsystem::RegisterGridActor(AHB_Grid_Base* InGridActor)
+{
+	if (!IsValid(InGridActor))
+	{
+		return;
+	}
+
+	const FGridInfo CenterCoord = InGridActor->GetCenterFragmentCoord();
+	GridActorMap.Add(CenterCoord, InGridActor);
+
+	AHB_GridManager* GridMgr = GetManager<AHB_GridManager>();
+	if (!GridMgr)
+	{
+		UE_LOG(LogGridSubsystem, Warning, TEXT("RegisterGridActor: GridManager is null"));
+		return;
+	}
+
+	const TArray<FGridInfo> FragmentCoords = InGridActor->GetAllFragmentCoords();
+	for (const FGridInfo& Coord : FragmentCoords)
+	{
+		GridMgr->RegisterFreeGridInfo(Coord.X, Coord.Y);
+	}
+}
+
+AHB_Grid_Base* UHB_GridSubsystem::FindGridActorByFragmentCoord(int32 InX, int32 InY) const
+{
+	// 根据 Fragment 坐标反推 Grid 中心坐标：Grid 中心是 GridWidthFragment/LengthFragment 的整数倍
+	const int32 GridWidthFragment = const_cast<UHB_GridSubsystem*>(this)->GetGridWidthFragment();
+	const int32 GridLengthFragment = const_cast<UHB_GridSubsystem*>(this)->GetGridLengthFragment();
+	if (GridWidthFragment <= 0 || GridLengthFragment <= 0)
+	{
+		return nullptr;
+	}
+
+	const int32 CenterX = FMath::Floor((static_cast<float>(InX) + GridWidthFragment / 2.0f) / GridWidthFragment) * GridWidthFragment;
+	const int32 CenterY = FMath::Floor((static_cast<float>(InY) + GridLengthFragment / 2.0f) / GridLengthFragment) * GridLengthFragment;
+
+	if (const TWeakObjectPtr<AHB_Grid_Base>* GridPtr = GridActorMap.Find(FGridInfo(CenterX, CenterY)))
+	{
+		return GridPtr->Get();
+	}
+	return nullptr;
 }
 
 FVector UHB_GridSubsystem::GetNextNavigationPoint(FVector CurrentLocation, FVector TargetLocation)
@@ -251,7 +434,7 @@ FVector UHB_GridSubsystem::GetNextNavigationPoint(FVector CurrentLocation, FVect
 void UHB_GridSubsystem::OnSpawnBuilding(AHB_Building_Base* NewBuilding, FTransform SpawnTransform)
 {
 	FVector2D GridIndex = CalulateGridIndexByLocation(SpawnTransform.GetLocation());
-	GetManager<AHB_GridManager>()->CacheUsedGridInfo(GridIndex.X,GridIndex.Y);
+	GetManager<AHB_GridManager>()->CacheUsedGridInfo(GridIndex.X, GridIndex.Y);
 }
 
 void UHB_GridSubsystem::OnDestroyBuilding(AHB_Building_Base* InBuilding, FTransform InTransform)
@@ -267,6 +450,24 @@ void UHB_GridSubsystem::OnSpawnResource(AHB_Resource_Base* InResource, FTransfor
 }
 
 void UHB_GridSubsystem::OnDestroyResource(AHB_Resource_Base* InResource, FTransform InTransform)
+{
+	FVector2D GridIndex = CalulateGridIndexByLocation(InTransform.GetLocation());
+	GetManager<AHB_GridManager>()->RemoveUsedGridInfo(GridIndex.X, GridIndex.Y);
+}
+
+void UHB_GridSubsystem::OnSpawnTotem(AHB_Totem_Base* InTotem, FTransform InTransform)
+{
+	FVector2D GridIndex = CalulateGridIndexByLocation(InTransform.GetLocation());
+	GetManager<AHB_GridManager>()->CacheUsedGridInfo(GridIndex.X, GridIndex.Y);
+}
+
+void UHB_GridSubsystem::OnSpawnEnemy(AHB_Enemy_Base* InEnemy, FTransform InTransform)
+{
+	FVector2D GridIndex = CalulateGridIndexByLocation(InTransform.GetLocation());
+	GetManager<AHB_GridManager>()->CacheUsedGridInfo(GridIndex.X, GridIndex.Y);
+}
+
+void UHB_GridSubsystem::OnDestroyEnemy(AHB_Enemy_Base* InEnemy, FTransform InTransform)
 {
 	FVector2D GridIndex = CalulateGridIndexByLocation(InTransform.GetLocation());
 	GetManager<AHB_GridManager>()->RemoveUsedGridInfo(GridIndex.X, GridIndex.Y);

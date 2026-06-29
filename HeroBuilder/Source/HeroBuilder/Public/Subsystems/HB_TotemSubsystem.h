@@ -15,6 +15,8 @@ class AHB_Enemy_Base;
 class AHB_TotemManager;
 class AHB_TotemHelper;
 
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnSpawnTotem, AHB_Totem_Base* /*InTotem*/, FTransform /*InTransform*/);
+
 /**
  * 图腾子系统
  * 负责图腾数据的加载、图腾实例的生成与激活、波次配置的查询。
@@ -62,6 +64,9 @@ public:
 	/** 获取配置查表接口 */
 	bool GetConfig(TSubclassOf<AHB_Totem_Base> TotemClass, FTotemConfig& OutConfig) const;
 	bool GetWaveConfig(TSubclassOf<AHB_Totem_Base> TotemClass, int32 WaveIndex, FWaveConfig& OutWaveConfig) const;
+
+	/** 图腾生成事件（供 GridSubsystem 等监听以同步占位） */
+	FOnSpawnTotem OnSpawnTotem;
 
 protected:
 	/** 图腾波次完成时的统一回调（可在此处做全局奖励/通知） */

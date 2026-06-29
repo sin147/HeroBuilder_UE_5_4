@@ -52,7 +52,7 @@ void UHB_ResourceSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	TickSpawnResource();
-	TickAutoSpawn(DeltaTime);
+	//TickAutoSpawn(DeltaTime);
 }
 
 void UHB_ResourceSubsystem::TickAutoSpawn(float DeltaTime)
@@ -221,6 +221,12 @@ FTransform UHB_ResourceSubsystem::GetRandomSpawnTransform() const
 			Grid.X * GridWidth + GridWidth * 0.5f,
 			Grid.Y * GridWidth + GridWidth * 0.5f,
 			0.f);
+
+		// 预占位：防止该 Fragment 在资源出队生成前被建筑占用
+		if (GridSubsystem && NetMode != NM_Client)
+		{
+			GridSubsystem->OccupyGrid(Grid.X, Grid.Y);
+		}
 	}
 	else
 	{
@@ -240,7 +246,16 @@ FTransform UHB_ResourceSubsystem::GetRandomSpawnTransform() const
 		const float Dist = FMath::Sqrt(RSq);
 		SpawnLocation = PlayerCenter + FVector(FMath::Cos(Angle) * Dist, FMath::Sin(Angle) * Dist, 0.f);
 		SpawnLocation.Z = 0.f;
+
+		// 回退位置也预占位（ best-effort 防止建筑抢占）
+		if (GridSubsystem && NetMode != NM_Client)
+		{
+			const FVector2D FallbackGrid = GridSubsystem->CalulateGridIndexByLocation(SpawnLocation);
+			GridSubsystem->OccupyGrid(FallbackGrid.X, FallbackGrid.Y);
+		}
 	}
+
+
 
 	const FRotator SpawnRotation = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
 	return FTransform(SpawnRotation, SpawnLocation);

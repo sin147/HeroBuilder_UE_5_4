@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "HeroBuilderGameState.h"
 #include "Manager/HB_Base_Manager.h"
@@ -7,8 +7,8 @@
 #include "Subsystems/HB_GridSubsystem.h"
 #include "Subsystems/HB_EnemySubsystem.h"
 #include "Subsystems/HB_ResourceSubsystem.h"
-#include "UObject/UObjectIterator.h"
-#include "Engine/World.h"
+#include "Config/GridData.h"
+
 
 DEFINE_LOG_CATEGORY_STATIC(LogHeroBuilderGameState, Log, All);
 
@@ -113,8 +113,37 @@ void AHeroBuilderGameState::ClearHelpers()
 void AHeroBuilderGameState::HandleBeginPlay()
 {
 	Super::HandleBeginPlay();
-	//生成地形
-
+	
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	SpawnAllManagersAndHelpers();
+	
+	// 根据 GridData 中配置的 Area Level 列表，依次从中心向外生成区域
+	if (UWorld* World = GetWorld())
+	{
+		if (UHB_GridSubsystem* GridSubsystem = World->GetSubsystem<UHB_GridSubsystem>())
+		{
+			if (UGridData* GridData = GridSubsystem->GetGridData())
+			{
+				const TArray<int32> AllLevels = GridData->GetAllAreaLevels();
+				for (int32 Level : AllLevels)
+				{
+					GridSubsystem->SpawnAreaByLevel(Level);
+				}
+			}
+			else
+			{
+				UE_LOG(LogHeroBuilderGameState, Error, TEXT("HandleBeginPlay: GridData is null, skip spawning areas"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogHeroBuilderGameState, Error, TEXT("HandleBeginPlay: Failed to get GridSubsystem"));
+		}
+	}
 	//生成图腾
 
 	//生成Boss
